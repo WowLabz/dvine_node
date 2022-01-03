@@ -42,7 +42,8 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
-pub use pallet_dvine;
+pub use pallet_vine;
+pub use pallet_user;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -280,7 +281,11 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-impl pallet_dvine::Config for Runtime {
+impl pallet_vine::Config for Runtime {
+	type Event = Event;
+}
+
+impl pallet_user::Config for Runtime {
 	type Event = Event;
 }
 
@@ -301,7 +306,8 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		Dvine: pallet_dvine,
+		Vine: pallet_vine,
+		User: pallet_user,
 	}
 );
 
