@@ -114,16 +114,16 @@ pub mod currency {
     // Provide a common factor between runtimes based on a supply of 10_000_000 tokens.
 	pub const SUPPLY_FACTOR: Balance = 1;
 
-    pub const MICROYODA: Balance = 10_000;
-	pub const MILLIYODA: Balance = 10_000_000;
-	pub const YODA: Balance = 10_000_000_000;
-	pub const KILOYODA: Balance = 10_000_000_000_000;
+    pub const MICRODVINE: Balance = 10_000;
+	pub const MILLIDVINE: Balance = 10_000_000;
+	pub const DVINE: Balance = 10_000_000_000;
+	pub const KILODVINE: Balance = 10_000_000_000_000;
 
-    pub const TRANSACTION_BYTE_FEE: Balance = 10 * MICROYODA * SUPPLY_FACTOR;
-	pub const STORAGE_BYTE_FEE: Balance = 100 * MICROYODA * SUPPLY_FACTOR;
+    pub const TRANSACTION_BYTE_FEE: Balance = 10 * MICRODVINE * SUPPLY_FACTOR;
+	pub const STORAGE_BYTE_FEE: Balance = 100 * MICRODVINE * SUPPLY_FACTOR;
 
 	pub const fn deposit(items: u32, bytes: u32) -> Balance {
-		items as Balance * 1 * YODA * SUPPLY_FACTOR + (bytes as Balance) * STORAGE_BYTE_FEE
+		items as Balance * 1 * DVINE * SUPPLY_FACTOR + (bytes as Balance) * STORAGE_BYTE_FEE
 	}
 }
 
