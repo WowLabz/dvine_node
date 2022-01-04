@@ -14,7 +14,7 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify},
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify, Zero, AccountIdConversion},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
 };
@@ -26,16 +26,28 @@ use sp_version::RuntimeVersion;
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
 	construct_runtime, parameter_types,
-	traits::{KeyOwnerProofSystem, Randomness, StorageInfo},
+	traits::{KeyOwnerProofSystem, Randomness, StorageInfo, BalanceStatus as Status, Contains, Currency as PalletCurrency, ExistenceRequirement, Get, Imbalance,
+		LockableCurrency as PalletLockableCurrency, ReservableCurrency as PalletReservableCurrency, SignedImbalance,
+		WithdrawReasons},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		IdentityFee, Weight,
 	},
 	StorageValue,
+	PalletId,
 };
+pub use frame_system::EnsureRoot;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
+use orml_currencies::BasicCurrencyAdapter;
+use orml_traits::{
+	arithmetic::{self, Signed},
+	currency::TransferAll,
+	BalanceStatus, GetByKey, LockIdentifier, MultiCurrency, MultiCurrencyExtended, MultiLockableCurrency,
+	MultiReservableCurrency, OnDust, parameter_type_with_key,
+};
+
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
@@ -63,6 +75,8 @@ pub type Index = u32;
 
 /// A hash of some data used by the chain.
 pub type Hash = sp_core::H256;
+
+pub type AssetId = u64;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -276,6 +290,55 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+// pub fn get_all_module_accounts() -> Vec<AccountId> {
+// 	vec![
+// 		OnDustPalletId::get().into_account()
+// 	]
+// }
+
+// pub struct DustRemovalWhitelist;
+// impl Contains<AccountId> for DustRemovalWhitelist {
+// 	fn contains(a: &AccountId) -> bool {
+// 		get_all_module_accounts().contains(a)
+// 	}
+// }
+
+// parameter_type_with_key! {
+// 	pub ExistentialDeposits: |_currency_id: u128| -> Balance {
+// 		Zero::zero()
+// 	};
+// }
+
+//  parameter_types! {
+// 	pub const OnDustPalletId: PalletId = PalletId(*b"bit/dust");
+// 	pub OnDustAccountId: AccountId = OnDustPalletId::get().into_account();
+//  }
+
+// impl orml_tokens::Config for Runtime {
+//     type Event = Event;
+//     type Balance = Balance;
+//     type Amount = i64;
+//     type CurrencyId = u128;
+// 	// type OnReceived = ();
+// 	type WeightInfo = ();
+//     type ExistentialDeposits = ExistentialDeposits;
+// 	type OnDust = orml_tokens::TransferDust<Runtime, OnDustAccountId>;
+//     type MaxLocks = MaxLocks;
+//     type DustRemovalWhitelist = DustRemovalWhitelist;
+// }
+
+// parameter_types! {
+// 	pub const GetNativeCurrencyId: u128 = 0;
+// }
+
+// impl orml_currencies::Config for Runtime {
+// 	type Event = Event;
+// 	type MultiCurrency = Tokens;
+// 	type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances, i64, BlockNumber>;
+// 	type GetNativeCurrencyId = GetNativeCurrencyId;
+// 	type WeightInfo = ();
+// }
+
 /// Configure the pallet-template in pallets/template.
 impl pallet_template::Config for Runtime {
 	type Event = Event;
@@ -283,6 +346,7 @@ impl pallet_template::Config for Runtime {
 
 impl pallet_vine::Config for Runtime {
 	type Event = Event;
+	type Currency = Balances;
 }
 
 impl pallet_user::Config for Runtime {
@@ -296,18 +360,19 @@ construct_runtime!(
 		NodeBlock = opaque::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system,
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip,
-		Timestamp: pallet_timestamp,
-		Aura: pallet_aura,
-		Grandpa: pallet_grandpa,
-		Balances: pallet_balances,
-		TransactionPayment: pallet_transaction_payment,
-		Sudo: pallet_sudo,
-		// Include the custom logic from the pallet-template in the runtime.
-		TemplateModule: pallet_template,
-		Vine: pallet_vine,
-		User: pallet_user,
+		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
+		Aura: pallet_aura::{Pallet, Config<T>},
+		Grandpa: pallet_grandpa::{Pallet, Call, Storage, Config, Event},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
+		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
+		// Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>},
+		// Currencies: orml_currencies::{Pallet, Call, Event<T>},
+		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
+		Vine: pallet_vine::{Pallet, Call, Storage, Event<T>},
+		User: pallet_user::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
