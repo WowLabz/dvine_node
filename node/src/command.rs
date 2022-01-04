@@ -3,8 +3,8 @@ use crate::{
 	cli::{Cli, Subcommand},
 	service,
 };
-use node_template_runtime::Block;
-use sc_cli::{ChainSpec, RuntimeVersion, SubstrateCli};
+use dvine_runtime::Block;
+use sc_cli::{ChainSpec, Role, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
 
 impl SubstrateCli for Cli {
@@ -42,7 +42,7 @@ impl SubstrateCli for Cli {
 	}
 
 	fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		&node_template_runtime::VERSION
+		&dvine_runtime::VERSION
 	}
 }
 
@@ -111,7 +111,11 @@ pub fn run() -> sc_cli::Result<()> {
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
-				service::new_full(config).map_err(sc_cli::Error::Service)
+				match config.role {
+					Role::Light => service::new_light(config),
+					_ => service::new_full(config),
+				}
+				.map_err(sc_cli::Error::Service)
 			})
 		},
 	}

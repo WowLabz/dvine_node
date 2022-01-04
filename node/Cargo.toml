@@ -1,13 +1,11 @@
 [package]
 name = 'dvine-node'
-version = '4.0.0-dev'
-description = 'A fresh FRAME-based Substrate node, ready for hacking.'
-authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-homepage = 'https://substrate.io/'
+version = '3.0.0-monthly-2021-10'
+description = 'Creator Economy'
 edition = '2021'
-license = 'Unlicense'
+license = 'Apache-2.0'
 publish = false
-repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
+repository = 'https://github.com/WowLabz/yoda_creator_economy_node'
 build = 'build.rs'
 
 [[bin]]
@@ -27,6 +25,7 @@ version = '1.0.0'
 [dependencies]
 jsonrpc-core = '18.0.0'
 structopt = '0.3.8'
+serde_json = "1.0.69"
 
 [dependencies.frame-benchmarking]
 git = 'https://github.com/paritytech/substrate.git'
@@ -117,7 +116,7 @@ branch = "polkadot-v0.9.12"
 
 [dependencies.sp-consensus-aura]
 git = 'https://github.com/paritytech/substrate.git'
-branch = "polkadot-v0.9.12"
+branch = "polkadot-v0.9.12" 
 
 [dependencies.sp-core]
 git = 'https://github.com/paritytech/substrate.git'

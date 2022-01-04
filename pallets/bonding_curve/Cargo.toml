@@ -1,6 +1,6 @@
 [package]
-name = 'pallet-template'
-version = '3.0.0-monthly-2021-10'
+name = 'pallet-bonding-curve'
+version = '1.0.0'
 description = 'FRAME pallet template for defining custom runtime logic.'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
 homepage = 'https://substrate.dev'
@@ -18,6 +18,35 @@ features = ['derive']
 package = 'parity-scale-codec'
 version = '2.0.0'
 
+[dependencies.log]
+default-features = false
+version = '0.4.14'
+
+[dependencies.sp-runtime]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
+
+[dependencies.scale-info]
+default-features = false
+features = ['derive']
+version = '1.0'
+
+[dependencies.orml-currencies]
+default-features = false
+git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+version = '0.4.1-dev'
+
+[dependencies.orml-tokens]
+default-features = false
+git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+version = '0.4.1-dev'
+
+[dependencies.orml-traits]
+default-features = false
+git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+version = '0.4.1-dev'
+
 [dependencies.frame-benchmarking]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -34,10 +63,10 @@ default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 branch = "polkadot-v0.9.12"
 
-[dependencies.scale-info]
+[dependencies.pallet-balances]
 default-features = false
-features = ['derive']
-version = '1.0'
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
 
 [dev-dependencies.sp-core]
 default-features = false
@@ -63,5 +92,7 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-benchmarking/std',
+    'orml-tokens/std',
+    'orml-traits/std',
 ]
 try-runtime = ['frame-support/try-runtime']
