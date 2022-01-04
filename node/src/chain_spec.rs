@@ -150,5 +150,7 @@ fn testnet_genesis(
 			key: root_key,
 		},
 		transaction_payment: Default::default(),
+		assets: Default::default(),
+		tokens: TokensConfig { balances: vec![] },
 	}
 }

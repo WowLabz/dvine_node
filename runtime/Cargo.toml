@@ -1,34 +1,26 @@
 [package]
-name = 'node-template-runtime'
-version = '4.0.0-dev'
-description = 'A fresh FRAME-based Substrate runtime, ready for hacking.'
-authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-homepage = 'https://substrate.io/'
+name = 'dvine-runtime'
+version = "1.0.0"
+description = 'Decentralized Vine'
 edition = '2021'
 license = 'Unlicense'
 publish = false
-repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
 
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']
 
-[build-dependencies.substrate-wasm-builder]
-git = 'https://github.com/paritytech/substrate.git'
-branch = "polkadot-v0.9.12"
-
 [dependencies.pallet-template]
 default-features = false
 path = '../pallets/template'
-version = '4.0.0-dev'
-
-[dependencies.pallet-vine]
-default-features = false
-path = '../pallets/pallet_vine'
-version = '1.0.0'
 
 [dependencies.pallet-user]
 default-features = false
 path = '../pallets/pallet_user'
+version = '1.0.0'
+
+[dependencies.pallet-vine]
+default-features = false
+path = '../pallets/pallet_vine'
 version = '1.0.0'
 
 [dependencies.orml-currencies]
@@ -45,6 +37,10 @@ version = '0.4.1-dev'
 default-features = false
 git = 'https://github.com/open-web3-stack/open-runtime-module-library'
 version = '0.4.1-dev'
+
+[build-dependencies.substrate-wasm-builder]
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
 
 [dependencies.codec]
 default-features = false
@@ -94,6 +90,11 @@ git = 'https://github.com/paritytech/substrate.git'
 branch = "polkadot-v0.9.12"
 
 [dependencies.pallet-balances]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
+
+[dependencies.pallet-assets]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 branch = "polkadot-v0.9.12"
@@ -215,6 +216,7 @@ std = [
     'orml-traits/std',
     'pallet-aura/std',
     'pallet-balances/std',
+    'pallet-assets/std',
     'pallet-grandpa/std',
     'pallet-randomness-collective-flip/std',
     'pallet-sudo/std',

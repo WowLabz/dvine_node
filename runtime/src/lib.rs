@@ -6,6 +6,10 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
+/// Constant values used within the runtime.
+// pub mod constants;
+// use constants::currency;
+
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -54,8 +58,8 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
-pub use pallet_vine;
 pub use pallet_user;
+pub use pallet_vine;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -102,8 +106,28 @@ pub mod opaque {
 	}
 }
 
+
+pub mod currency {
+    use super::Balance;
+
+    // Provide a common factor between runtimes based on a supply of 10_000_000 tokens.
+	pub const SUPPLY_FACTOR: Balance = 1;
+
+    pub const MICROYODA: Balance = 10_000;
+	pub const MILLIYODA: Balance = 10_000_000;
+	pub const YODA: Balance = 10_000_000_000;
+	pub const KILOYODA: Balance = 10_000_000_000_000;
+
+    pub const TRANSACTION_BYTE_FEE: Balance = 10 * MICROYODA * SUPPLY_FACTOR;
+	pub const STORAGE_BYTE_FEE: Balance = 100 * MICROYODA * SUPPLY_FACTOR;
+
+	pub const fn deposit(items: u32, bytes: u32) -> Balance {
+		items as Balance * 1 * YODA * SUPPLY_FACTOR + (bytes as Balance) * STORAGE_BYTE_FEE
+	}
+}
+
 // To learn more about runtime versioning and what each of the following value means:
-//   https://docs.substrate.io/v3/runtime/upgrades#runtime-versioning
+//   https://substrate.dev/docs/en/knowledgebase/runtime/upgrades#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node-template"),
@@ -273,16 +297,40 @@ impl pallet_balances::Config for Runtime {
 }
 
 parameter_types! {
-	pub const TransactionByteFee: Balance = 1;
-	pub OperationalFeeMultiplier: u8 = 5;
+	pub const AssetDeposit: Balance = 100 * 100;
+	pub const ApprovalDeposit: Balance = 1 * 100;
+	pub const StringLimit: u32 = 50;
+	pub const MetadataDepositBase: Balance = 10 * 100;
+	pub const MetadataDepositPerByte: Balance = 1 * 100;
+}
+
+impl pallet_assets::Config for Runtime {
+	type Event = Event;
+	type Balance = Balance;
+	type AssetId = AssetId;
+	type Currency = Balances;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type AssetDeposit = AssetDeposit;
+	type MetadataDepositBase = MetadataDepositBase;
+	type MetadataDepositPerByte = MetadataDepositPerByte;
+	type ApprovalDeposit = ApprovalDeposit;
+	type StringLimit = StringLimit;
+	type Freezer = ();
+	type Extra = ();
+	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+}
+
+parameter_types! {
+	pub const TransactionByteFee: Balance = currency::TRANSACTION_BYTE_FEE;
+    pub const OperationalFeeMultiplier: u8 = 5;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
 	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
 	type TransactionByteFee = TransactionByteFee;
-	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();
+    type OperationalFeeMultiplier = OperationalFeeMultiplier;
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -290,58 +338,59 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
-// pub fn get_all_module_accounts() -> Vec<AccountId> {
-// 	vec![
-// 		OnDustPalletId::get().into_account()
-// 	]
-// }
-
-// pub struct DustRemovalWhitelist;
-// impl Contains<AccountId> for DustRemovalWhitelist {
-// 	fn contains(a: &AccountId) -> bool {
-// 		get_all_module_accounts().contains(a)
-// 	}
-// }
-
-// parameter_type_with_key! {
-// 	pub ExistentialDeposits: |_currency_id: u128| -> Balance {
-// 		Zero::zero()
-// 	};
-// }
-
-//  parameter_types! {
-// 	pub const OnDustPalletId: PalletId = PalletId(*b"bit/dust");
-// 	pub OnDustAccountId: AccountId = OnDustPalletId::get().into_account();
-//  }
-
-// impl orml_tokens::Config for Runtime {
-//     type Event = Event;
-//     type Balance = Balance;
-//     type Amount = i64;
-//     type CurrencyId = u128;
-// 	// type OnReceived = ();
-// 	type WeightInfo = ();
-//     type ExistentialDeposits = ExistentialDeposits;
-// 	type OnDust = orml_tokens::TransferDust<Runtime, OnDustAccountId>;
-//     type MaxLocks = MaxLocks;
-//     type DustRemovalWhitelist = DustRemovalWhitelist;
-// }
-
-// parameter_types! {
-// 	pub const GetNativeCurrencyId: u128 = 0;
-// }
-
-// impl orml_currencies::Config for Runtime {
-// 	type Event = Event;
-// 	type MultiCurrency = Tokens;
-// 	type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances, i64, BlockNumber>;
-// 	type GetNativeCurrencyId = GetNativeCurrencyId;
-// 	type WeightInfo = ();
-// }
-
 /// Configure the pallet-template in pallets/template.
 impl pallet_template::Config for Runtime {
 	type Event = Event;
+	//type Currency = currency;
+}
+
+pub fn get_all_module_accounts() -> Vec<AccountId> {
+	vec![
+		OnDustPalletId::get().into_account()
+	]
+}
+
+pub struct DustRemovalWhitelist;
+impl Contains<AccountId> for DustRemovalWhitelist {
+	fn contains(a: &AccountId) -> bool {
+		get_all_module_accounts().contains(a)
+	}
+}
+
+parameter_type_with_key! {
+	pub ExistentialDeposits: |_currency_id: u128| -> Balance {
+		Zero::zero()
+	};
+}
+
+ parameter_types! {
+	pub const OnDustPalletId: PalletId = PalletId(*b"bit/dust");
+	pub OnDustAccountId: AccountId = OnDustPalletId::get().into_account();
+ }
+
+impl orml_tokens::Config for Runtime {
+    type Event = Event;
+    type Balance = Balance;
+    type Amount = i64;
+    type CurrencyId = u128;
+	// type OnReceived = ();
+	type WeightInfo = ();
+    type ExistentialDeposits = ExistentialDeposits;
+	type OnDust = orml_tokens::TransferDust<Runtime, OnDustAccountId>;
+    type MaxLocks = MaxLocks;
+    type DustRemovalWhitelist = DustRemovalWhitelist;
+}
+
+parameter_types! {
+	pub const GetNativeCurrencyId: u128 = 0;
+}
+
+impl orml_currencies::Config for Runtime {
+	type Event = Event;
+	type MultiCurrency = Tokens;
+	type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances, i64, BlockNumber>;
+	type GetNativeCurrencyId = GetNativeCurrencyId;
+	type WeightInfo = ();
 }
 
 impl pallet_vine::Config for Runtime {
@@ -366,13 +415,16 @@ construct_runtime!(
 		Aura: pallet_aura::{Pallet, Config<T>},
 		Grandpa: pallet_grandpa::{Pallet, Call, Storage, Config, Event},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		// FinancialCouncil: pallet_collective::<Instance2>::{Pallet, Call, Storage, Origin<T>, Event<T>, Config<T>} = 63,
+		Assets: pallet_assets::{Pallet, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
-		// Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>},
-		// Currencies: orml_currencies::{Pallet, Call, Event<T>},
+		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
-		Vine: pallet_vine::{Pallet, Call, Storage, Event<T>},
+		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>},
+		Currencies: orml_currencies::{Pallet, Call, Event<T>},
 		User: pallet_user::{Pallet, Call, Storage, Event<T>},
+		Vine: pallet_vine::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -400,7 +452,7 @@ pub type Executive = frame_executive::Executive<
 	Block,
 	frame_system::ChainContext<Runtime>,
 	Runtime,
-	AllPalletsWithSystem,
+	AllPallets,
 >;
 
 impl_runtime_apis! {
@@ -540,14 +592,12 @@ impl_runtime_apis! {
 			Vec<frame_benchmarking::BenchmarkList>,
 			Vec<frame_support::traits::StorageInfo>,
 		) {
-			use frame_benchmarking::{list_benchmark, baseline, Benchmarking, BenchmarkList};
+			use frame_benchmarking::{list_benchmark, Benchmarking, BenchmarkList};
 			use frame_support::traits::StorageInfoTrait;
 			use frame_system_benchmarking::Pallet as SystemBench;
-			use baseline::Pallet as BaselineBench;
 
 			let mut list = Vec::<BenchmarkList>::new();
 
-			list_benchmark!(list, extra, frame_benchmarking, BaselineBench::<Runtime>);
 			list_benchmark!(list, extra, frame_system, SystemBench::<Runtime>);
 			list_benchmark!(list, extra, pallet_balances, Balances);
 			list_benchmark!(list, extra, pallet_timestamp, Timestamp);
@@ -561,13 +611,10 @@ impl_runtime_apis! {
 		fn dispatch_benchmark(
 			config: frame_benchmarking::BenchmarkConfig
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
-			use frame_benchmarking::{baseline, Benchmarking, BenchmarkBatch, add_benchmark, TrackedStorageKey};
+			use frame_benchmarking::{Benchmarking, BenchmarkBatch, add_benchmark, TrackedStorageKey};
 
 			use frame_system_benchmarking::Pallet as SystemBench;
-			use baseline::Pallet as BaselineBench;
-
 			impl frame_system_benchmarking::Config for Runtime {}
-			impl baseline::Config for Runtime {}
 
 			let whitelist: Vec<TrackedStorageKey> = vec![
 				// Block Number
@@ -585,12 +632,12 @@ impl_runtime_apis! {
 			let mut batches = Vec::<BenchmarkBatch>::new();
 			let params = (&config, &whitelist);
 
-			add_benchmark!(params, batches, frame_benchmarking, BaselineBench::<Runtime>);
 			add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
 			add_benchmark!(params, batches, pallet_template, TemplateModule);
 
+			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)
 		}
 	}

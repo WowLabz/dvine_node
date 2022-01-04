@@ -20,9 +20,9 @@ targets = ['x86_64-unknown-linux-gnu']
 git = 'https://github.com/paritytech/substrate.git'
 branch = "polkadot-v0.9.12"
 
-[dependencies.node-template-runtime]
+[dependencies.dvine-runtime]
 path = '../runtime'
-version = '4.0.0-dev'
+version = '1.0.0'
 
 [dependencies]
 jsonrpc-core = '18.0.0'
@@ -141,4 +141,4 @@ branch = "polkadot-v0.9.12"
 
 [features]
 default = []
-runtime-benchmarks = ['node-template-runtime/runtime-benchmarks']
+runtime-benchmarks = ['dvine-runtime/runtime-benchmarks']
