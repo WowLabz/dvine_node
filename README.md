@@ -44,7 +44,7 @@ Once the project has been built, the following command can be used to explore al
 subcommands:
 
 ```sh
-./target/release/yoda-creator-economy -h
+./target/release/dvine-node -h
 ```
 
 ## Run
@@ -58,19 +58,19 @@ node.
 This command will start the single-node development chain with persistent state:
 
 ```bash
-./target/release/yoda-creator-economy --dev
+./target/release/dvine-node --dev
 ```
 
 Purge the development chain's state:
 
 ```bash
-./target/release/yoda-creator-economy purge-chain --dev
+./target/release/dvine-node purge-chain --dev
 ```
 
 Start the development chain with detailed logging:
 
 ```bash
-RUST_BACKTRACE=1 ./target/release/yoda-creator-economy -ldebug --dev
+RUST_BACKTRACE=1 ./target/release/dvine-node -ldebug --dev
 ```
 
 ### Connect with Polkadot-JS Apps Front-end
