@@ -74,7 +74,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		// Properties
 		Some(
 			serde_json::from_str(
-				"{\"tokenDecimals\": 12, \"tokenSymbol\": \"YODA\", \"SS58Prefix\": 42}",
+				"{\"tokenDecimals\": 12, \"tokenSymbol\": \"DVINE\", \"SS58Prefix\": 42}",
 			)
 			.expect("Provided valid json map"),
 		),
