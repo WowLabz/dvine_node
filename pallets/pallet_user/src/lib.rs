@@ -110,6 +110,8 @@ pub mod pallet {
 		UserWithTokenCreated(UserId, Vec<u8>, CurrencyIdOf<T>, Vec<u8>),
 		/// (Minter, TokenId, MintAmount, Cost)
 		TokenMint(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
+		/// (Burner, AssetId, BurnAmount, ReturnAmount)
+		TokenBurn(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
 	}
 
 	#[pallet::error]
@@ -263,8 +265,45 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn sell_user_token(
 			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let seller = ensure_signed(origin)?;
+
+			let token = Self::tokens_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+
+			T::Currency::ensure_can_withdraw(token_id, &seller, amount)?;
+
+			let total_issuance = T::Currency::total_issuance(token_id);
+			let issuance_after = total_issuance - amount;
+
+			let curve_config = token.token_info.curve_type.get_curve_config();
+			log::info!("curve_config: {:#?}", curve_config);
+
+			let integral_before: BalanceOf<T> =
+				curve_config.integral(total_issuance.saturated_into::<u128>()).saturated_into();
+			let integral_after: BalanceOf<T> =
+				curve_config.integral(issuance_after.saturated_into::<u128>()).saturated_into();
+
+			let return_amount = integral_before - integral_after;
+			log::info!(
+				"return amount selling {:#?} tokens is {:#?}",
+				amount,
+				return_amount.clone()
+			);
+			
+			let token_account = T::PalletId::get().into_sub_account(token.token_info.curve_id);
+
+			T::Currency::withdraw(token_id, &seller, amount)?;
+
+			T::Currency::transfer(
+				T::GetNativeCurrencyId::get(),
+				&token_account,
+				&seller,
+				return_amount,
+			)?;
+
+			Self::deposit_event(Event::TokenBurn(seller, token_id, amount, return_amount));
 			Ok(())
 		}
 
