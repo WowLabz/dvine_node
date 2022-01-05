@@ -14,89 +14,236 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+mod curves;
+
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use crate::curves::*;
+	use frame_support::{
+		dispatch::DispatchResult,
+		inherent::Vec,
+		pallet_prelude::{OptionQuery, *},
+		traits::{Currency, ExistenceRequirement, Get, Randomness},
+		transactional, PalletId,
+	};
 	use frame_system::pallet_prelude::*;
+	use orml_traits::{MultiCurrency, MultiReservableCurrency};
+	use scale_info::{prelude::boxed::Box, TypeInfo};
+	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
+	type BalanceOf<T> =
+		<<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::Balance;
+	type AccountOf<T> = <T as frame_system::Config>::AccountId;
+	type CurrencyIdOf<T> = <<T as Config>::Currency as MultiCurrency<
+		<T as frame_system::Config>::AccountId,
+	>>::CurrencyId;
+	type UserId = u64;
+
+	#[derive(Encode, Decode, TypeInfo, Clone, PartialEq)]
+	#[scale_info(skip_type_params(T))]
+	#[cfg_attr(feature = "std", derive(Debug))]
+	pub struct User<T: Config> {
+		pub(super) id: UserId,
+		pub(super) name: Vec<u8>,
+		pub(super) profile_image: Vec<u8>,
+		pub(super) vines_count: Option<u64>,
+		pub(super) is_following: bool,
+		pub(super) accounts: Vec<AccountOf<T>>,
+		pub(super) token_info: TokenInfo<T>,
+	}
+
+	#[derive(Encode, Decode, TypeInfo, Clone, PartialEq)]
+	#[scale_info(skip_type_params(T))]
+	#[cfg_attr(feature = "std", derive(Debug))]
+	pub struct TokenInfo<T: Config> {
+		pub(super) currency_id: CurrencyIdOf<T>,
+		pub(super) curve_id: u64,
+		pub(super) creator: AccountOf<T>,
+		pub(super) curve_type: CurveType,
+		pub(super) token_name: Vec<u8>,
+		pub(super) token_symbol: Vec<u8>,
+		pub(super) token_decimals: u8,
+		pub(super) max_supply: BalanceOf<T>,
+	}
+
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+		type Currency: MultiReservableCurrency<Self::AccountId>;
+
+		/// The native currency.
+		type GetNativeCurrencyId: Get<CurrencyIdOf<Self>>;
+
+		/// The deposit required for creating a new bonding curve.
+		type CurveDeposit: Get<BalanceOf<Self>>;
+
+		/// The deposit required for creating a new asset with bonding curve.
+		type CreatorAssetDeposit: Get<BalanceOf<Self>>;
+
+		/// The module/pallet identifier.
+		type PalletId: Get<PalletId>;
 	}
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn next_id)]
+	pub(super) type NextId<T: Config> = StorageValue<_, u64, ValueQuery>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/v3/runtime/events-and-errors
+	#[pallet::storage]
+	#[pallet::getter(fn users)]
+	pub(super) type Users<T: Config> = StorageMap<_, Twox64Concat, UserId, User<T>, OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn tokens_storage)]
+	pub(super) type TokensStorage<T: Config> =
+		StorageMap<_, Twox64Concat, CurrencyIdOf<T>, User<T>, OptionQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		/// [UserId, UserName, TokenId, TokenName]
+		UserWithTokenCreated(UserId, Vec<u8>, CurrencyIdOf<T>, Vec<u8>),
 	}
 
-	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		/// Sender does not have enough base currency to reserve for a new curve.
+		InsufficientBalanceToReserve,
+		/// The currency that is trying to be created already exists.
+		AssetAlreadyExists,
 	}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
-			let who = ensure_signed(origin)?;
+		pub fn create_user(
+			origin: OriginFor<T>,
+			user_name: Vec<u8>,
+			profile_image: Vec<u8>,
+			vines_count: Option<u64>,
+			is_following: bool,
+			currency_id: CurrencyIdOf<T>,
+			curve_type: CurveType,
+			token_name: Vec<u8>,
+			token_decimals: u8,
+			token_symbol: Vec<u8>,
+			max_supply: BalanceOf<T>,
+		) -> DispatchResult {
+			let creator = ensure_signed(origin)?;
 
-			// Update storage.
-			<Something<T>>::put(something);
+			log::info!(
+				"native token free_balance {:#?}",
+				T::Currency::free_balance(T::GetNativeCurrencyId::get(), &creator)
+			);
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
+			// Requires an amount to be reserved.
+			ensure!(
+				T::Currency::can_reserve(
+					T::GetNativeCurrencyId::get(),
+					&creator,
+					T::CreatorAssetDeposit::get()
+				),
+				Error::<T>::InsufficientBalanceToReserve,
+			);
+
+			// Ensure that a curve with this id does not already exist.
+			ensure!(
+				T::Currency::total_issuance(currency_id) == 0u32.into(),
+				Error::<T>::AssetAlreadyExists,
+			);
+
+			log::info!("total issuance {:#?}", T::Currency::total_issuance(currency_id));
+
+			// Adds 1 of the token to the module account.
+			T::Currency::deposit(
+				currency_id,
+				&T::PalletId::get().into_account(),
+				2u128.saturated_into(),
+			)?;
+
+			log::info!("total issuance {:#?}", T::Currency::total_issuance(currency_id));
+
+			let curr_id = Self::get_next_id();
+
+			let new_token_info = TokenInfo::<T> {
+				currency_id: currency_id.clone(),
+				curve_id: curr_id,
+				creator: creator.clone(),
+				curve_type,
+				token_name: token_name.clone(),
+				token_symbol,
+				token_decimals,
+				max_supply,
+			};
+
+			let new_user = User::<T> {
+				id: curr_id,
+				name: user_name.clone(),
+				profile_image,
+				vines_count,
+				is_following,
+				accounts: vec![creator],
+				token_info: new_token_info,
+			};
+
+			Users::<T>::insert(curr_id, new_user);
+
+			Self::deposit_event(Event::UserWithTokenCreated(
+				curr_id,
+				user_name,
+				currency_id,
+				token_name,
+			));
+
 			Ok(())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn buy_user_token(
+			origin: OriginFor<T>,
+		) -> DispatchResult {
+			let buyer = ensure_signed(origin)?;
+			Ok(())
 		}
+
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn sell_user_token(
+			origin: OriginFor<T>,
+		) -> DispatchResult {
+			let seller = ensure_signed(origin)?;
+			Ok(())
+		}
+
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn user_token_spot_price(
+			origin: OriginFor<T>,
+		) -> DispatchResult {
+			let user = ensure_signed(origin)?;
+			Ok(())
+		}
+
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn user_token_airdrop(
+			origin: OriginFor<T>,
+		) -> DispatchResult {
+			let caller = ensure_signed(origin)?;
+			Ok(())
+		}
+	}
+}
+
+impl<T: Config> Pallet<T> {
+	fn get_next_id() -> u64 {
+		let id = Self::next_id();
+		log::info!("before next_id {:#?}", id);
+		<NextId<T>>::mutate(|n| *n += 1);
+		let id = Self::next_id();
+		log::info!("after next_id {:#?}", id);
+		id
 	}
 }

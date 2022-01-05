@@ -411,6 +411,11 @@ impl pallet_bonding_curve::Config for Runtime {
 
 impl pallet_user::Config for Runtime {
 	type Event = Event;
+	type Currency = Currencies;
+	type GetNativeCurrencyId = GetNativeCurrencyId;
+	type CurveDeposit = CurveDeposit;
+	type CreatorAssetDeposit = CreatorAssetDeposit;
+	type PalletId = BondingCurveModuleId;
 }
 
 impl pallet_vine::Config for Runtime {

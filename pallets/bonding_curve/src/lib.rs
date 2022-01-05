@@ -19,15 +19,17 @@ mod benchmarking;
 #[frame_support::pallet]
 pub mod pallet {
 	use crate::curves::*;
-	use frame_support::inherent::Vec;
-	use frame_support::pallet_prelude::OptionQuery;
-use frame_support::traits::{Currency, ExistenceRequirement, Get, Randomness};
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, transactional, PalletId};
+	use frame_support::{
+		dispatch::DispatchResult,
+		inherent::Vec,
+		pallet_prelude::{OptionQuery, *},
+		traits::{Currency, ExistenceRequirement, Get, Randomness},
+		transactional, PalletId,
+	};
 	use frame_system::pallet_prelude::*;
 	//use orml_currencies::CurrencyIdOf;
-use orml_traits::{MultiCurrency, MultiReservableCurrency};
-	use scale_info::prelude::boxed::Box;
-	use scale_info::TypeInfo;
+	use orml_traits::{MultiCurrency, MultiReservableCurrency};
+	use scale_info::{prelude::boxed::Box, TypeInfo};
 	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
 
 	type BalanceOf<T> =
@@ -132,9 +134,8 @@ use orml_traits::{MultiCurrency, MultiReservableCurrency};
 
 	#[pallet::storage]
 	#[pallet::getter(fn spot_price)]
-	pub(super) type SpotPrice<T: Config> = 
-	StorageMap<_,Twox64Concat, CurrencyIdOf<T>, BalanceOf<T>>;
-
+	pub(super) type SpotPrice<T: Config> =
+		StorageMap<_, Twox64Concat, CurrencyIdOf<T>, BalanceOf<T>>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -324,7 +325,11 @@ use orml_traits::{MultiCurrency, MultiReservableCurrency};
 				curve.integral_after(issuance_after.saturated_into::<u128>()).saturated_into();
 
 			let return_amount = integral_before - integral_after;
-			log::info!("return amount selling {:#?} tokens is {:#?}", amount, return_amount.clone());
+			log::info!(
+				"return amount selling {:#?} tokens is {:#?}",
+				amount,
+				return_amount.clone()
+			);
 
 			let token_account = T::PalletId::get().into_sub_account(token.curve_id);
 
@@ -337,30 +342,24 @@ use orml_traits::{MultiCurrency, MultiReservableCurrency};
 				return_amount,
 			)?;
 
-			Self::deposit_event(Event::AssetBurn(
-				seller,
-				asset_id,
-				amount,
-				return_amount,
-			));
+			Self::deposit_event(Event::AssetBurn(seller, asset_id, amount, return_amount));
 			Ok(())
 		}
 
 		#[pallet::weight(0)]
-		pub fn asset_spot_price(
-			origin: OriginFor<T>,
-			asset_id: CurrencyIdOf<T>,
-		) -> DispatchResult {
+		pub fn asset_spot_price(origin: OriginFor<T>, asset_id: CurrencyIdOf<T>) -> DispatchResult {
 			let _caller = ensure_signed(origin.clone())?;
 			let token = Self::assets_minted(asset_id).ok_or(<Error<T>>::AssetDoesNotExist)?;
 			let curve = token.get_curve_config()?;
 			let total_issuance = T::Currency::total_issuance(asset_id).saturated_into::<u128>();
 			log::info!("Total Issuance of the asset {:?}", total_issuance);
-			let current_price: u128 =
-				curve.integral_before(total_issuance);
+			let current_price: u128 = curve.integral_before(total_issuance);
 			let spot_price: BalanceOf<T> = (current_price / total_issuance).saturated_into();
 			log::info!("spot price: {:#?}", current_price.clone());
-			log::info!("actual spot price{:?}", current_price.clone().saturated_into::<u128>()/total_issuance.clone());
+			log::info!(
+				"actual spot price{:?}",
+				current_price.clone().saturated_into::<u128>() / total_issuance.clone()
+			);
 			Self::deposit_event(Event::AssetSpotPrice(asset_id, spot_price));
 			<SpotPrice<T>>::insert(asset_id.clone(), spot_price);
 			Ok(())
