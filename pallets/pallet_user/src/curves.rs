@@ -34,10 +34,10 @@ pub enum CurveType {
 impl CurveType {
 	pub fn get_curve_config(&self) -> CurveConfig {
 		match &self {
-			CurveType::Exponential => CurveConfig { exponent: 10, slope: 10 },
-			CurveType::Flat => CurveConfig { exponent: 100, slope: 100 },
-			CurveType::Linear => CurveConfig { exponent: 50, slope: 100 },
-			CurveType::Logarithmic => CurveConfig { exponent: 90, slope: 100 },
+			CurveType::Exponential => CurveConfig { exponent: 1, slope: 1 },
+			CurveType::Flat => CurveConfig { exponent: 1, slope: 1 },
+			CurveType::Linear => CurveConfig { exponent: 1, slope: 1 },
+			CurveType::Logarithmic => CurveConfig { exponent: 1, slope: 1 },
 		}
 	}
 }
