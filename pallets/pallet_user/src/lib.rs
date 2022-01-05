@@ -115,10 +115,12 @@ pub mod pallet {
 		UserWithTokenCreated(UserId, Vec<u8>, CurrencyIdOf<T>, Vec<u8>),
 		/// (Minter, TokenId, MintAmount, Cost)
 		TokenMint(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
-		/// (Burner, AssetId, BurnAmount, ReturnAmount)
+		/// (Burner, TokenId, BurnAmount, ReturnAmount)
 		TokenBurn(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
 		/// (TokenId, Amount)
 		TokenSpotPrice(CurrencyIdOf<T>, BalanceOf<T>),
+		/// (TokenId, Amount, FromAccount, ToAccounts)
+		UserTokensAirDropped(CurrencyIdOf<T>, BalanceOf<T>, AccountOf<T>, Vec<AccountOf<T>>),
 	}
 
 	#[pallet::error]
@@ -343,8 +345,28 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn user_token_airdrop(
 			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+			beneficiaries: Vec<AccountOf<T>>,
+			amount: BalanceOf<T>,
 		) -> DispatchResult {
-			let caller = ensure_signed(origin)?;
+			let _caller = ensure_signed(origin)?;
+
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let total_withdraw_amount: BalanceOf<T> =
+				(amount.saturated_into::<u128>() * beneficiaries.len() as u128).saturated_into();
+			log::info!("airdrop total_withdraw_amount: {:#?}", total_withdraw_amount);
+
+			for beneficiary in &beneficiaries {
+				T::Currency::deposit(token_id, beneficiary, amount)?;
+			}
+
+			Self::deposit_event(Event::UserTokensAirDropped(
+				token_id,
+				amount,
+				token.token_info.creator,
+				beneficiaries.clone(),
+			));
+
 			Ok(())
 		}
 	}
