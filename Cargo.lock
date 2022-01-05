@@ -4034,6 +4034,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "pallet-bonding-curve",
  "parity-scale-codec",
  "scale-info",
  "sp-core",

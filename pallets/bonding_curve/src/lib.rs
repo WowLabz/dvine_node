@@ -110,7 +110,7 @@ use orml_traits::{MultiCurrency, MultiReservableCurrency};
 
 	#[pallet::storage]
 	#[pallet::getter(fn next_curve_id)]
-	pub(super) type NextCurveId<T: Config> = StorageValue<_, u64, ValueQuery>;
+	pub type NextCurveId<T: Config> = StorageValue<_, u64, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn assets_minted)]

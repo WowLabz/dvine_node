@@ -18,10 +18,11 @@ mod benchmarking;
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	pub use pallet_bonding_curve;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + pallet_bonding_curve::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 	}
@@ -73,6 +74,10 @@ pub mod pallet {
 
 			// Update storage.
 			<Something<T>>::put(something);
+
+			let value = 10u32;
+			//<module1::Something<T>>::get()
+			<pallet_bonding_curve::NextCurveId<T>>::get();
 
 			// Emit an event.
 			Self::deposit_event(Event::SomethingStored(something, who));
