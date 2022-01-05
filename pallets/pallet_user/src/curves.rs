@@ -1,8 +1,7 @@
 use frame_support::pallet_prelude::*;
 use scale_info::TypeInfo;
 
-#[derive(Encode, Decode, TypeInfo, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Encode, Decode, TypeInfo, Clone, PartialEq, Debug)]
 pub struct CurveConfig {
 	exponent: u32,
 	slope: u128,
@@ -24,8 +23,7 @@ impl CurveConfig {
 	}
 }
 
-#[derive(Encode, Decode, TypeInfo, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Encode, Decode, TypeInfo, Clone, PartialEq, Debug)]
 pub enum CurveType {
 	Linear,
 	Exponential,

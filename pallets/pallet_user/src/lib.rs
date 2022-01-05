@@ -19,6 +19,7 @@ mod curves;
 #[frame_support::pallet]
 pub mod pallet {
 	use crate::curves::*;
+	use scale_info::prelude::vec;
 	use frame_support::{
 		dispatch::DispatchResult,
 		inherent::Vec,
