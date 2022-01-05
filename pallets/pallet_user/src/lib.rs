@@ -121,7 +121,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn create_user(
+		pub fn create_user_with_token(
 			origin: OriginFor<T>,
 			user_name: Vec<u8>,
 			profile_image: Vec<u8>,
