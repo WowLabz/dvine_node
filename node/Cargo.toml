@@ -5,7 +5,6 @@ description = 'Creator Economy'
 edition = '2021'
 license = 'Apache-2.0'
 publish = false
-repository = 'https://github.com/WowLabz/yoda_creator_economy_node'
 build = 'build.rs'
 
 [[bin]]

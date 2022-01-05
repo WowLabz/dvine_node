@@ -60,7 +60,6 @@ pub use sp_runtime::{Perbill, Permill};
 pub use pallet_template;
 pub use pallet_user;
 pub use pallet_vine;
-pub use pallet_bonding_curve;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -397,16 +396,7 @@ impl orml_currencies::Config for Runtime {
 parameter_types! {
 	pub const CurveDeposit: u128 = 10;
 	pub const CreatorAssetDeposit: u128 = 10;
-	pub const BondingCurveModuleId: PalletId = PalletId(*b"sub/bond");
-}
-
-impl pallet_bonding_curve::Config for Runtime {
-	type Event = Event;
-	type Currency = Currencies;
-	type GetNativeCurrencyId = GetNativeCurrencyId;
-	type CurveDeposit = CurveDeposit;
-	type CreatorAssetDeposit = CreatorAssetDeposit;
-	type PalletId = BondingCurveModuleId;
+	pub const BondingCurvePalletId: PalletId = PalletId(*b"sub/bond");
 }
 
 impl pallet_user::Config for Runtime {
@@ -415,7 +405,7 @@ impl pallet_user::Config for Runtime {
 	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type CurveDeposit = CurveDeposit;
 	type CreatorAssetDeposit = CreatorAssetDeposit;
-	type PalletId = BondingCurveModuleId;
+	type PalletId = BondingCurvePalletId;
 }
 
 impl pallet_vine::Config for Runtime {
@@ -444,7 +434,6 @@ construct_runtime!(
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
 		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>},
 		Currencies: orml_currencies::{Pallet, Call, Event<T>},
-		BondingCurve: pallet_bonding_curve::{Pallet, Call, Storage, Event<T>},
 		User: pallet_user::{Pallet, Call, Storage, Event<T>},
 		Vine: pallet_vine::{Pallet, Call, Storage, Event<T>},
 	}
