@@ -99,9 +99,14 @@ pub mod pallet {
 	pub(super) type Users<T: Config> = StorageMap<_, Twox64Concat, UserId, User<T>, OptionQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn tokens_storage)]
-	pub(super) type TokensStorage<T: Config> =
+	#[pallet::getter(fn token_storage)]
+	pub(super) type TokenStorage<T: Config> =
 		StorageMap<_, Twox64Concat, CurrencyIdOf<T>, User<T>, OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn token_spot_price)]
+	pub(super) type TokenSpotPrice<T: Config> =
+		StorageMap<_, Twox64Concat, CurrencyIdOf<T>, BalanceOf<T>>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -112,6 +117,8 @@ pub mod pallet {
 		TokenMint(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
 		/// (Burner, AssetId, BurnAmount, ReturnAmount)
 		TokenBurn(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
+		/// (TokenId, Amount)
+		TokenSpotPrice(CurrencyIdOf<T>, BalanceOf<T>),
 	}
 
 	#[pallet::error]
@@ -202,7 +209,7 @@ pub mod pallet {
 			};
 
 			Users::<T>::insert(curr_id, new_user.clone());
-			TokensStorage::<T>::insert(token_id, new_user);
+			TokenStorage::<T>::insert(token_id, new_user);
 
 			Self::deposit_event(Event::UserWithTokenCreated(
 				curr_id,
@@ -222,7 +229,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let buyer = ensure_signed(origin)?;
 
-			let token = Self::tokens_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
 
 			let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
 			log::info!("total issuance {:#?}", total_issuance.clone());
@@ -270,7 +277,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let seller = ensure_signed(origin)?;
 
-			let token = Self::tokens_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
 
 			T::Currency::ensure_can_withdraw(token_id, &seller, amount)?;
 
@@ -310,8 +317,26 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn user_token_spot_price(
 			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
 		) -> DispatchResult {
-			let user = ensure_signed(origin)?;
+			let _user = ensure_signed(origin)?;
+
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let curve_config = token.token_info.curve_type.get_curve_config();
+			let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
+			log::info!("Total Issuance of the asset {:?}", total_issuance);
+
+			let current_price: u128 = curve_config.integral(total_issuance);
+			let spot_price: BalanceOf<T> = (current_price / total_issuance).saturated_into();
+			log::info!("spot price: {:#?}", current_price.clone());
+			log::info!(
+				"actual spot price{:?}",
+				current_price.clone().saturated_into::<u128>() / total_issuance.clone()
+			);
+
+			<TokenSpotPrice<T>>::insert(token_id.clone(), spot_price);
+
+			Self::deposit_event(Event::TokenSpotPrice(token_id, spot_price));
 			Ok(())
 		}
 
