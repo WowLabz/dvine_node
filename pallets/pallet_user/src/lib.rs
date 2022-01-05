@@ -56,7 +56,7 @@ pub mod pallet {
 	#[scale_info(skip_type_params(T))]
 	#[cfg_attr(feature = "std", derive(Debug))]
 	pub struct TokenInfo<T: Config> {
-		pub(super) currency_id: CurrencyIdOf<T>,
+		pub(super) token_id: CurrencyIdOf<T>,
 		pub(super) curve_id: u64,
 		pub(super) creator: AccountOf<T>,
 		pub(super) curve_type: CurveType,
@@ -108,14 +108,22 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// [UserId, UserName, TokenId, TokenName]
 		UserWithTokenCreated(UserId, Vec<u8>, CurrencyIdOf<T>, Vec<u8>),
+		/// (Minter, TokenId, MintAmount, Cost)
+		TokenMint(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Sender does not have enough base currency to reserve for a new curve.
 		InsufficientBalanceToReserve,
-		/// The currency that is trying to be created already exists.
-		AssetAlreadyExists,
+		/// The token that is trying to be created already exists.
+		TokenAlreadyExists,
+		/// Error when an creator token does not exist
+		TokenDoesNotExist,
+		/// Error when the token max supply exceeds
+		TokenMaxSupplyExceeded,
+		/// Sender does not have enough base currency to make a purchase.
+		InsufficentBalanceForPurchase,
 	}
 
 	#[pallet::call]
@@ -127,7 +135,7 @@ pub mod pallet {
 			profile_image: Vec<u8>,
 			vines_count: Option<u64>,
 			is_following: bool,
-			currency_id: CurrencyIdOf<T>,
+			token_id: CurrencyIdOf<T>,
 			curve_type: CurveType,
 			token_name: Vec<u8>,
 			token_decimals: u8,
@@ -153,25 +161,25 @@ pub mod pallet {
 
 			// Ensure that a curve with this id does not already exist.
 			ensure!(
-				T::Currency::total_issuance(currency_id) == 0u32.into(),
-				Error::<T>::AssetAlreadyExists,
+				T::Currency::total_issuance(token_id) == 0u32.into(),
+				Error::<T>::TokenAlreadyExists,
 			);
 
-			log::info!("total issuance {:#?}", T::Currency::total_issuance(currency_id));
+			log::info!("total issuance {:#?}", T::Currency::total_issuance(token_id));
 
 			// Adds 1 of the token to the module account.
 			T::Currency::deposit(
-				currency_id,
+				token_id,
 				&T::PalletId::get().into_account(),
 				2u128.saturated_into(),
 			)?;
 
-			log::info!("total issuance {:#?}", T::Currency::total_issuance(currency_id));
+			log::info!("total issuance {:#?}", T::Currency::total_issuance(token_id));
 
 			let curr_id = Self::get_next_id();
 
 			let new_token_info = TokenInfo::<T> {
-				currency_id: currency_id.clone(),
+				token_id: token_id.clone(),
 				curve_id: curr_id,
 				creator: creator.clone(),
 				curve_type,
@@ -191,12 +199,13 @@ pub mod pallet {
 				token_info: new_token_info,
 			};
 
-			Users::<T>::insert(curr_id, new_user);
+			Users::<T>::insert(curr_id, new_user.clone());
+			TokensStorage::<T>::insert(token_id, new_user);
 
 			Self::deposit_event(Event::UserWithTokenCreated(
 				curr_id,
 				user_name,
-				currency_id,
+				token_id,
 				token_name,
 			));
 
@@ -206,8 +215,48 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn buy_user_token(
 			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			let buyer = ensure_signed(origin)?;
+
+			let token = Self::tokens_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+
+			let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
+			log::info!("total issuance {:#?}", total_issuance.clone());
+
+			let issuance_after = total_issuance + amount.saturated_into::<u128>();
+			ensure!(
+				issuance_after <= token.token_info.max_supply.saturated_into::<u128>(),
+				Error::<T>::TokenMaxSupplyExceeded,
+			);
+
+			let curve_config = token.token_info.curve_type.get_curve_config();
+			log::info!("curve_config: {:#?}", curve_config);
+
+			let integral_before: BalanceOf<T> =
+				curve_config.integral(total_issuance).saturated_into();
+			let integral_after: BalanceOf<T> =
+				curve_config.integral(issuance_after).saturated_into();
+
+			let cost = integral_after - integral_before;
+			log::info!("cost to buy {:#?} tokens is {:#?}", amount, cost.clone());
+
+			ensure!(
+				T::Currency::free_balance(T::GetNativeCurrencyId::get(), &buyer) >= cost.into(),
+				Error::<T>::InsufficentBalanceForPurchase,
+			);
+
+			let token_account = T::PalletId::get().into_sub_account(token.token_info.curve_id);
+
+			// Transfer the network tokens from the buyers' acoount
+			// to the admin account
+			T::Currency::transfer(T::GetNativeCurrencyId::get(), &buyer, &token_account, cost)?;
+
+			// Deposit the creator tokens to the buyer's acoount
+			T::Currency::deposit(token_id, &buyer, amount)?;
+
+			Self::deposit_event(Event::TokenMint(buyer, token_id, amount, cost));
 			Ok(())
 		}
 
