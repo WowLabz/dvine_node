@@ -35,6 +35,30 @@ default-features = false
 features = ['derive']
 version = '1.0'
 
+[dependencies.orml-traits]
+default-features = false
+git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+version = '0.4.1-dev'
+
+[dependencies.pallet-user]
+default-features = false
+path = "../pallet_user"
+version = '1.0.0'
+
+[dependencies.log]
+default-features = false
+version = '0.4.14'
+
+[dependencies.sp-runtime]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
+
+[dependencies.sp-io]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
+
 [dev-dependencies.sp-core]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'

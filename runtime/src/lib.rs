@@ -410,7 +410,9 @@ impl pallet_user::Config for Runtime {
 
 impl pallet_vine::Config for Runtime {
 	type Event = Event;
-	type Currency = Balances;
+	type Currency = Currencies;
+	type GetNativeCurrencyId = GetNativeCurrencyId;
+	type PalletId = BondingCurvePalletId;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

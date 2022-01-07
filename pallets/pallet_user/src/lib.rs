@@ -19,7 +19,6 @@ mod curves;
 #[frame_support::pallet]
 pub mod pallet {
 	use crate::curves::*;
-	use scale_info::prelude::vec;
 	use frame_support::{
 		dispatch::DispatchResult,
 		inherent::Vec,
@@ -29,6 +28,7 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
+	use scale_info::prelude::vec;
 	use scale_info::{prelude::boxed::Box, TypeInfo};
 	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
 
@@ -38,33 +38,31 @@ pub mod pallet {
 	type CurrencyIdOf<T> = <<T as Config>::Currency as MultiCurrency<
 		<T as frame_system::Config>::AccountId,
 	>>::CurrencyId;
-	type UserId = u64;
+	pub type UserId = u64;
 
-	#[derive(Encode, Decode, TypeInfo, Clone, PartialEq)]
+	#[derive(Encode, Decode, Debug, TypeInfo, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
-	#[cfg_attr(feature = "std", derive(Debug))]
 	pub struct User<T: Config> {
-		pub(super) id: UserId,
-		pub(super) name: Vec<u8>,
-		pub(super) profile_image: Vec<u8>,
-		pub(super) vines_count: Option<u64>,
-		pub(super) is_following: bool,
-		pub(super) accounts: Vec<AccountOf<T>>,
-		pub(super) token_info: TokenInfo<T>,
+		pub id: UserId,
+		pub name: Vec<u8>,
+		pub profile_image: Vec<u8>,
+		pub vines_count: Option<u64>,
+		pub is_following: bool,
+		pub accounts: Vec<AccountOf<T>>,
+		pub token_info: TokenInfo<T>,
 	}
 
-	#[derive(Encode, Decode, TypeInfo, Clone, PartialEq)]
+	#[derive(Encode, Decode, Debug, TypeInfo, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
-	#[cfg_attr(feature = "std", derive(Debug))]
 	pub struct TokenInfo<T: Config> {
-		pub(super) token_id: CurrencyIdOf<T>,
-		pub(super) curve_id: u64,
-		pub(super) creator: AccountOf<T>,
-		pub(super) curve_type: CurveType,
-		pub(super) token_name: Vec<u8>,
-		pub(super) token_symbol: Vec<u8>,
-		pub(super) token_decimals: u8,
-		pub(super) max_supply: BalanceOf<T>,
+		pub token_id: CurrencyIdOf<T>,
+		pub curve_id: u64,
+		pub creator: AccountOf<T>,
+		pub curve_type: CurveType,
+		pub token_name: Vec<u8>,
+		pub token_symbol: Vec<u8>,
+		pub token_decimals: u8,
+		pub max_supply: BalanceOf<T>,
 	}
 
 	#[pallet::config]
@@ -97,11 +95,11 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn users)]
-	pub(super) type Users<T: Config> = StorageMap<_, Twox64Concat, UserId, User<T>, OptionQuery>;
+	pub type Users<T: Config> = StorageMap<_, Twox64Concat, UserId, User<T>, OptionQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn token_storage)]
-	pub(super) type TokenStorage<T: Config> =
+	pub type TokenStorage<T: Config> =
 		StorageMap<_, Twox64Concat, CurrencyIdOf<T>, User<T>, OptionQuery>;
 
 	#[pallet::storage]
@@ -145,8 +143,6 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			user_name: Vec<u8>,
 			profile_image: Vec<u8>,
-			vines_count: Option<u64>,
-			is_following: bool,
 			token_id: CurrencyIdOf<T>,
 			curve_type: CurveType,
 			token_name: Vec<u8>,
@@ -205,8 +201,8 @@ pub mod pallet {
 				id: curr_id,
 				name: user_name.clone(),
 				profile_image,
-				vines_count,
-				is_following,
+				vines_count: None,
+				is_following: false,
 				accounts: vec![creator],
 				token_info: new_token_info,
 			};
@@ -215,10 +211,7 @@ pub mod pallet {
 			TokenStorage::<T>::insert(token_id, new_user);
 
 			Self::deposit_event(Event::UserWithTokenCreated(
-				curr_id,
-				user_name,
-				token_id,
-				token_name,
+				curr_id, user_name, token_id, token_name,
 			));
 
 			Ok(())
@@ -301,7 +294,7 @@ pub mod pallet {
 				amount,
 				return_amount.clone()
 			);
-			
+
 			let token_account = T::PalletId::get().into_sub_account(token.token_info.curve_id);
 
 			T::Currency::withdraw(token_id, &seller, amount)?;
@@ -371,15 +364,15 @@ pub mod pallet {
 			Ok(())
 		}
 	}
-}
 
-impl<T: Config> Pallet<T> {
-	fn get_next_id() -> u64 {
-		let id = Self::next_id();
-		log::info!("before next_id {:#?}", id);
-		<NextId<T>>::mutate(|n| *n += 1);
-		let id = Self::next_id();
-		log::info!("after next_id {:#?}", id);
-		id
+	impl<T: Config> Pallet<T> {
+		fn get_next_id() -> u64 {
+			let id = Self::next_id();
+			log::info!("before next_id {:#?}", id);
+			<NextId<T>>::mutate(|n| *n += 1);
+			let id = Self::next_id();
+			log::info!("after next_id {:#?}", id);
+			id
+		}
 	}
 }
