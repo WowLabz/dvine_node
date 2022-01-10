@@ -42,7 +42,7 @@ version = '1.0'
 
 [dependencies.orml-traits]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../traits"
 version = '0.4.1-dev'
 
 [dependencies.pallet-user]

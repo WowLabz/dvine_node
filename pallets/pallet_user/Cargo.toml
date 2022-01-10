@@ -46,17 +46,17 @@ branch = "polkadot-v0.9.12"
 
 [dependencies.orml-currencies]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../currencies"
 version = '0.4.1-dev'
 
 [dependencies.orml-tokens]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../tokens"
 version = '0.4.1-dev'
 
 [dependencies.orml-traits]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../traits"
 version = '0.4.1-dev'
 
 [dev-dependencies.sp-core]

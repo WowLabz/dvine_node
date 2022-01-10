@@ -26,17 +26,22 @@ version = '1.0.0'
 
 [dependencies.orml-currencies]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../pallets/currencies"
 version = '0.4.1-dev'
 
 [dependencies.orml-tokens]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../pallets/tokens"
 version = '0.4.1-dev'
 
 [dependencies.orml-traits]
 default-features = false
-git = 'https://github.com/open-web3-stack/open-runtime-module-library'
+path = "../pallets/traits"
+version = '0.4.1-dev'
+
+[dependencies.orml-nft]
+default-features = false
+path = "../pallets/nft"
 version = '0.4.1-dev'
 
 [build-dependencies.substrate-wasm-builder]
@@ -215,6 +220,7 @@ std = [
     'orml-currencies/std',
     'orml-tokens/std',
     'orml-traits/std',
+    'orml-nft/std',
     'pallet-aura/std',
     'pallet-balances/std',
     'pallet-assets/std',
