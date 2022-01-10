@@ -31,6 +31,7 @@ pub mod pallet {
 	use scale_info::{prelude::boxed::Box, TypeInfo};
 	use sp_io::hashing::blake2_128;
 	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
+	use sp_std::slice::IterMut;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -101,6 +102,8 @@ pub mod pallet {
 		SomethingStored(u32, T::AccountId),
 		/// [UserId, VineId]
 		VineCreated(UserId, VineId),
+		/// [UserId, VineId]
+		VineViewed(UserId, VineId),
 	}
 
 	#[pallet::error]
@@ -109,6 +112,10 @@ pub mod pallet {
 		StorageOverflow,
 		/// Error when the user does not exist
 		UserDoesNotExist,
+		/// Error when user has not vines
+		UserHasNoVines,
+		/// Error when vine by the given vine_id does not exist
+		VineDoesNotExist,
 	}
 
 	#[pallet::call]
@@ -163,7 +170,29 @@ pub mod pallet {
 			user_id: UserId,
 			vine_id: VineId,
 		) -> DispatchResult {
-			let user = ensure_signed(origin)?;
+			let _user = ensure_signed(origin)?;
+
+			let _curr_user =
+				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
+
+			let mut user_vines =
+				Self::user_vine_storage(user_id).ok_or(Error::<T>::UserHasNoVines)?;
+
+			'vine_loop: for vine in user_vines.vines.iter_mut() {
+				if vine.vine_id == vine_id {
+					vine.did_view = true;
+					break 'vine_loop;
+				} else {
+					Err(Error::<T>::VineDoesNotExist)?;
+				}
+			}
+			VineStorageByUser::<T>::insert(user_id, user_vines);
+
+			let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
+			Self::update_all_vine_storate_vec(updated_user_vine);
+
+			Self::deposit_event(Event::<T>::VineViewed(user_id, vine_id));
+
 			Ok(())
 		}
 
