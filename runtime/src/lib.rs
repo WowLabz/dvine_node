@@ -9,7 +9,6 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 /// Constant values used within the runtime.
 // pub mod constants;
 // use constants::currency;
-
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -18,7 +17,10 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify, Zero, AccountIdConversion},
+	traits::{
+		AccountIdConversion, AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount,
+		NumberFor, Verify, Zero,
+	},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult, MultiSignature,
 };
@@ -30,27 +32,29 @@ use sp_version::RuntimeVersion;
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
 	construct_runtime, parameter_types,
-	traits::{KeyOwnerProofSystem, Randomness, StorageInfo, BalanceStatus as Status, Contains, Currency as PalletCurrency, ExistenceRequirement, Get, Imbalance,
-		LockableCurrency as PalletLockableCurrency, ReservableCurrency as PalletReservableCurrency, SignedImbalance,
-		WithdrawReasons},
+	traits::{
+		BalanceStatus as Status, Contains, Currency as PalletCurrency, ExistenceRequirement, Get,
+		Imbalance, KeyOwnerProofSystem, LockableCurrency as PalletLockableCurrency, Randomness,
+		ReservableCurrency as PalletReservableCurrency, SignedImbalance, StorageInfo,
+		WithdrawReasons,
+	},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		IdentityFee, Weight,
 	},
-	StorageValue,
-	PalletId,
+	PalletId, StorageValue,
 };
 pub use frame_system::EnsureRoot;
-pub use pallet_balances::Call as BalancesCall;
-pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::CurrencyAdapter;
 use orml_currencies::BasicCurrencyAdapter;
 use orml_traits::{
 	arithmetic::{self, Signed},
 	currency::TransferAll,
-	BalanceStatus, GetByKey, LockIdentifier, MultiCurrency, MultiCurrencyExtended, MultiLockableCurrency,
-	MultiReservableCurrency, OnDust, parameter_type_with_key,
+	parameter_type_with_key, BalanceStatus, GetByKey, LockIdentifier, MultiCurrency,
+	MultiCurrencyExtended, MultiLockableCurrency, MultiReservableCurrency, OnDust,
 };
+pub use pallet_balances::Call as BalancesCall;
+pub use pallet_timestamp::Call as TimestampCall;
+use pallet_transaction_payment::CurrencyAdapter;
 
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
@@ -106,19 +110,18 @@ pub mod opaque {
 	}
 }
 
-
 pub mod currency {
-    use super::Balance;
+	use super::Balance;
 
-    // Provide a common factor between runtimes based on a supply of 10_000_000 tokens.
+	// Provide a common factor between runtimes based on a supply of 10_000_000 tokens.
 	pub const SUPPLY_FACTOR: Balance = 1;
 
-    pub const MICRODVINE: Balance = 10_000;
+	pub const MICRODVINE: Balance = 10_000;
 	pub const MILLIDVINE: Balance = 10_000_000;
 	pub const DVINE: Balance = 10_000_000_000;
 	pub const KILODVINE: Balance = 10_000_000_000_000;
 
-    pub const TRANSACTION_BYTE_FEE: Balance = 10 * MICRODVINE * SUPPLY_FACTOR;
+	pub const TRANSACTION_BYTE_FEE: Balance = 10 * MICRODVINE * SUPPLY_FACTOR;
 	pub const STORAGE_BYTE_FEE: Balance = 100 * MICRODVINE * SUPPLY_FACTOR;
 
 	pub const fn deposit(items: u32, bytes: u32) -> Balance {
@@ -322,7 +325,7 @@ impl pallet_assets::Config for Runtime {
 
 parameter_types! {
 	pub const TransactionByteFee: Balance = currency::TRANSACTION_BYTE_FEE;
-    pub const OperationalFeeMultiplier: u8 = 5;
+	pub const OperationalFeeMultiplier: u8 = 5;
 }
 
 impl pallet_transaction_payment::Config for Runtime {
@@ -330,7 +333,7 @@ impl pallet_transaction_payment::Config for Runtime {
 	type TransactionByteFee = TransactionByteFee;
 	type WeightToFee = IdentityFee<Balance>;
 	type FeeMultiplierUpdate = ();
-    type OperationalFeeMultiplier = OperationalFeeMultiplier;
+	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 }
 
 impl pallet_sudo::Config for Runtime {
@@ -345,9 +348,7 @@ impl pallet_template::Config for Runtime {
 }
 
 pub fn get_all_module_accounts() -> Vec<AccountId> {
-	vec![
-		OnDustPalletId::get().into_account()
-	]
+	vec![OnDustPalletId::get().into_account()]
 }
 
 pub struct DustRemovalWhitelist;
@@ -363,22 +364,22 @@ parameter_type_with_key! {
 	};
 }
 
- parameter_types! {
-	pub const OnDustPalletId: PalletId = PalletId(*b"bit/dust");
-	pub OnDustAccountId: AccountId = OnDustPalletId::get().into_account();
- }
+parameter_types! {
+   pub const OnDustPalletId: PalletId = PalletId(*b"bit/dust");
+   pub OnDustAccountId: AccountId = OnDustPalletId::get().into_account();
+}
 
 impl orml_tokens::Config for Runtime {
-    type Event = Event;
-    type Balance = Balance;
-    type Amount = i64;
-    type CurrencyId = u128;
+	type Event = Event;
+	type Balance = Balance;
+	type Amount = i64;
+	type CurrencyId = u128;
 	// type OnReceived = ();
 	type WeightInfo = ();
-    type ExistentialDeposits = ExistentialDeposits;
+	type ExistentialDeposits = ExistentialDeposits;
 	type OnDust = orml_tokens::TransferDust<Runtime, OnDustAccountId>;
-    type MaxLocks = MaxLocks;
-    type DustRemovalWhitelist = DustRemovalWhitelist;
+	type MaxLocks = MaxLocks;
+	type DustRemovalWhitelist = DustRemovalWhitelist;
 }
 
 parameter_types! {
@@ -391,6 +392,24 @@ impl orml_currencies::Config for Runtime {
 	type NativeCurrency = BasicCurrencyAdapter<Runtime, Balances, i64, BlockNumber>;
 	type GetNativeCurrencyId = GetNativeCurrencyId;
 	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub const MaxClassMetadata: u32 = 10000;
+	pub const MaxTokenMetadata: u32 = 10000;
+	pub const ClassId: u32 = 1;
+	pub const TokenId: u64 = 1;
+}
+
+impl orml_nft::Config for Runtime {
+	type ClassId = ClassId;
+	type TokenId = TokenId;
+	// type ClassData = orml_traits::ClassData<BlockNumber>;
+	// type TokenData = orml_traits::TokenData<AccountId, BlockNumber>;
+	type ClassData = ();
+	type TokenData = ();
+	type MaxClassMetadata = MaxClassMetadata;
+	type MaxTokenMetadata = MaxTokenMetadata;
 }
 
 parameter_types! {
@@ -436,6 +455,7 @@ construct_runtime!(
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
 		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>},
 		Currencies: orml_currencies::{Pallet, Call, Event<T>},
+		OrmlNFT: orml_nft::{Pallet, Storage, Config<T>},
 		User: pallet_user::{Pallet, Call, Storage, Event<T>},
 		Vine: pallet_vine::{Pallet, Call, Storage, Event<T>},
 	}
