@@ -223,14 +223,14 @@ pub mod pallet {
 		) -> DispatchResult {
 			let user = ensure_signed(origin)?;
 
-			let curr_user =
+			let _curr_user =
 				pallet_user::Users::<T>::get(viewer_id).ok_or(Error::<T>::UserDoesNotExist)?;
 
 			let curr_user_vines = Self::vine_storage().ok_or(Error::<T>::UserHasNoVines)?;
 
 			// check if the  vine_id exists
 
-			let mut curr_user_vine = Self::get_user_vine(curr_user_vines, vine_id)?;
+			let mut curr_user_vine: UserVines<T> = Self::get_user_vine(curr_user_vines, vine_id)?;
 
 			// Creator cannot watch his own video for rewards
 			let c_vines = curr_user_vine.created_vines.clone();
@@ -314,22 +314,12 @@ pub mod pallet {
 			all_vines: Vec<UserVines<T>>,
 			vine_id: VineId,
 		) -> Result<UserVines<T>, Error<T>> {
-			let res;
-
-			all_vines.iter().map(|vine| {
-				res = vine.iter().find(|c_vine| c_vine == vine_id);
-			}
-			)
-
-			// 'loop_1: for vine in all_vines {
-			// 	for c_vine in vine.created_vines {
-			// 		if c_vine.vine_id == vine_id {
-			// 			Ok(vine)
-			// 		} else {
-			// 			Err(Error::<T>::VineDoesNotExist)
-			// 		}
-			// 	}
-			// }
+			all_vines
+				.into_iter()
+				.find(|vine| {
+					vine.created_vines.iter().find(|c_vine| c_vine.vine_id == vine_id) != None
+				})
+				.ok_or(Error::<T>::VineDoesNotExist)
 		}
 
 		// fn generate_vine_id() -> [u8; 16] {
