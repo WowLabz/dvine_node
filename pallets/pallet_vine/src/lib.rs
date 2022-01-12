@@ -46,7 +46,7 @@ pub mod pallet {
 	pub struct UserVines<T: Config> {
 		pub user: User<T>,
 		pub created_vines: Vec<Vine<T>>,
-		pub watched_vines: Option<Vec<WatchedVine<T>>>,
+		pub watched_vines: Vec<WatchedVine<T>>,
 	}
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
@@ -167,14 +167,14 @@ pub mod pallet {
 				let new_user_vines = UserVines::<T> {
 					user: curr_user,
 					created_vines: vec![new_vine.clone()],
-					watched_vines: None,
+					watched_vines: Vec::<WatchedVine<T>>::new(),
 				};
 
 				VineStorageByUser::<T>::insert(user_id, new_user_vines);
 			}
 
 			let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
-			Self::update_all_vine_storate_vec(updated_user_vine);
+			Self::update_all_vine_storage_vec(updated_user_vine);
 
 			Self::deposit_event(Event::<T>::VineCreated(user_id, vine_count));
 			Ok(())
@@ -206,7 +206,7 @@ pub mod pallet {
 			VineStorageByUser::<T>::insert(user_id, user_vines);
 
 			let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
-			Self::update_all_vine_storate_vec(updated_user_vine);
+			Self::update_all_vine_storage_vec(updated_user_vine);
 
 			Self::deposit_event(Event::<T>::VineViewed(user_id, vine_id));
 
@@ -223,7 +223,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let user = ensure_signed(origin)?;
 
-			let _curr_user =
+			let curr_user =
 				pallet_user::Users::<T>::get(viewer_id).ok_or(Error::<T>::UserDoesNotExist)?;
 
 			let curr_user_vines = Self::vine_storage().ok_or(Error::<T>::UserHasNoVines)?;
@@ -249,7 +249,8 @@ pub mod pallet {
 				is_watched: true,
 			};
 
-			if let Some(ref mut vines) = curr_user_vine.watched_vines {
+			if let Some(existing_viewer) = Self::user_vine_storage(viewer_id) {
+				let mut vines = existing_viewer.watched_vines;
 				for vine in vines.iter_mut() {
 					if vine.vine_id != vine_id {
 						vines.push(new_watched_vine.clone());
@@ -258,14 +259,34 @@ pub mod pallet {
 						Err(Error::<T>::RewardsAlreadyReceived)?;
 					}
 				}
+				VineStorageByUser::<T>::insert(viewer_id, existing_viewer);
 			} else {
-				curr_user_vine.watched_vines = Some(vec![new_watched_vine]);
+				let new_user_watched_data = UserVines::<T> {
+					user: curr_user,
+					created_vines: Vec::<Vine<T>>::new(),
+					watched_vines: vec![new_watched_vine],
+				};
+				VineStorageByUser::<T>::insert(viewer_id, new_user_watched_data);
 			}
 
+			// if let Some(ref mut vines) = curr_user_vine.watched_vines {
+			// 	for vine in vines.iter_mut() {
+			// 		if vine.vine_id != vine_id {
+			// 			vines.push(new_watched_vine.clone());
+			// 			break;
+			// 		} else {
+			// 			Err(Error::<T>::RewardsAlreadyReceived)?;
+			// 		}
+			// 	}
+			// } else {
+			// 	curr_user_vine.watched_vines = Some(vec![new_watched_vine]);
+			// }
+			// VineStorageByUser::<T>::insert(viewer_id, curr_user_vine);
+
 			// update all_vines storage
-			VineStorageByUser::<T>::insert(viewer_id, curr_user_vine);
 			let updated_user_vine = Self::user_vine_storage(viewer_id).unwrap();
-			Self::update_all_vine_storate_vec(updated_user_vine);
+
+			Self::update_all_vine_storage_vec(updated_user_vine);
 
 			Ok(())
 		}
@@ -277,7 +298,7 @@ pub mod pallet {
 			Self::vine_count()
 		}
 
-		fn update_all_vine_storate_vec(updated_user_vine: UserVines<T>) {
+		fn update_all_vine_storage_vec(updated_user_vine: UserVines<T>) {
 			if let Some(mut all_vines) = Self::vine_storage() {
 				if let Some(vine_index) =
 					all_vines.iter().position(|vine| vine.user.id == updated_user_vine.user.id)
