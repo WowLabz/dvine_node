@@ -394,23 +394,23 @@ impl orml_currencies::Config for Runtime {
 	type WeightInfo = ();
 }
 
-// parameter_types! {
-// 	pub const MaxClassMetadata: u32 = 10000;
-// 	pub const MaxTokenMetadata: u32 = 10000;
-// 	pub const ClassId: u32 = 1;
-// 	pub const TokenId: u64 = 1;
-// }
+parameter_types! {
+	pub const MaxClassMetadata: u32 = 10000;
+	pub const MaxTokenMetadata: u32 = 10000;
+	//pub const ClassId: u32 = 1;
+	//pub const TokenId: u32 = 1;
+}
 
-// impl orml_nft::Config for Runtime {
-// 	type ClassId = ClassId;
-// 	type TokenId = TokenId;
-// 	// type ClassData = orml_traits::ClassData<BlockNumber>;
-// 	// type TokenData = orml_traits::TokenData<AccountId, BlockNumber>;
-// 	type ClassData = ();
-// 	type TokenData = ();
-// 	type MaxClassMetadata = MaxClassMetadata;
-// 	type MaxTokenMetadata = MaxTokenMetadata;
-// }
+impl orml_nft::Config for Runtime {
+	type ClassId = u64;
+	type TokenId = u64;
+	// type ClassData = orml_traits::ClassData<BlockNumber>;
+	// type TokenData = orml_traits::TokenData<AccountId, BlockNumber>;
+	type ClassData = ();
+	type TokenData = ();
+	type MaxClassMetadata = MaxClassMetadata;
+	type MaxTokenMetadata = MaxTokenMetadata;
+}
 
 parameter_types! {
 	pub const CurveDeposit: u128 = 10;
@@ -455,7 +455,7 @@ construct_runtime!(
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
 		Tokens: orml_tokens::{Pallet, Call, Storage, Event<T>, Config<T>},
 		Currencies: orml_currencies::{Pallet, Call, Event<T>},
-		// OrmlNFT: orml_nft::{Pallet, Storage, Config<T>},
+		OrmlNFT: orml_nft::{Pallet, Storage, Call, Config<T>},
 		User: pallet_user::{Pallet, Call, Storage, Event<T>},
 		Vine: pallet_vine::{Pallet, Call, Storage, Event<T>},
 	}
