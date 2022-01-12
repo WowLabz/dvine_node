@@ -30,6 +30,7 @@ pub mod pallet {
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
 	use scale_info::prelude::vec;
 	use scale_info::{prelude::boxed::Box, TypeInfo};
+	use serde::{Deserialize, Serialize};
 	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
 
 	type BalanceOf<T> =
@@ -63,6 +64,18 @@ pub mod pallet {
 		pub token_symbol: Vec<u8>,
 		pub token_decimals: u8,
 		pub max_supply: BalanceOf<T>,
+	}
+
+	#[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
+	#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+	pub struct ClassData {
+		pub create_block: u32,
+	}
+
+	#[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
+	#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+	pub struct TokenData {
+		pub create_block: u32,
 	}
 
 	#[pallet::config]

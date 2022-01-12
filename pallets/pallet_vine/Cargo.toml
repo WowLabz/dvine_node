@@ -45,6 +45,11 @@ default-features = false
 path = "../traits"
 version = '0.4.1-dev'
 
+[dependencies.orml-nft]
+default-features = false
+path = "../nft"
+version = '0.4.1-dev'
+
 [dependencies.pallet-user]
 default-features = false
 path = "../pallet_user"

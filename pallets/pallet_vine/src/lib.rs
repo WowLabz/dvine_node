@@ -26,7 +26,7 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
-	use pallet_user::{User, UserId};
+	use pallet_user::{ClassData, User, UserId};
 	use scale_info::prelude::vec;
 	use scale_info::{prelude::boxed::Box, TypeInfo};
 	use sp_io::hashing::blake2_128;
@@ -39,6 +39,10 @@ pub mod pallet {
 	type CurrencyIdOf<T> = <<T as Config>::Currency as MultiCurrency<
 		<T as frame_system::Config>::AccountId,
 	>>::CurrencyId;
+	pub type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
+	pub type TokenIdOf<T> = <T as orml_nft::Config>::TokenId;
+	pub type ClassIdOf<T> = <T as orml_nft::Config>::ClassId;
+
 	pub type VineId = u64;
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
@@ -46,7 +50,7 @@ pub mod pallet {
 	pub struct UserVines<T: Config> {
 		pub user: User<T>,
 		pub created_vines: Vec<Vine<T>>,
-		pub watched_vines: Vec<WatchedVine<T>>,
+		pub watched_vines: Option<Vec<WatchedVine<T>>>,
 	}
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
@@ -76,7 +80,11 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_user::Config {
+	pub trait Config:
+		frame_system::Config
+		+ pallet_user::Config
+		+ orml_nft::Config<TokenData = pallet_user::TokenData, ClassData = pallet_user::ClassData>
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
@@ -145,6 +153,15 @@ pub mod pallet {
 			let curr_user =
 				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
 
+			let data: ClassData = ClassData { create_block: 1u32 };
+
+			let x: TokenIdOf<T> = 1u32.into();
+			let y: ClassIdOf<T> = 1u32.into();
+			let z = orml_nft::Pallet::<T>::is_owner(&creator, (y, x));
+			log::info!("test orml_nft: {}", z);
+
+			let u = orml_nft::Pallet::<T>::create_class(&creator, b"metadata".to_vec(), data)?;
+
 			let vine_count = Self::increment_vine_counter();
 
 			let new_vine = Vine::<T> {
@@ -167,7 +184,7 @@ pub mod pallet {
 				let new_user_vines = UserVines::<T> {
 					user: curr_user,
 					created_vines: vec![new_vine.clone()],
-					watched_vines: Vec::<WatchedVine<T>>::new(),
+					watched_vines: Some(Vec::<WatchedVine<T>>::new()),
 				};
 
 				VineStorageByUser::<T>::insert(user_id, new_user_vines);
@@ -249,27 +266,8 @@ pub mod pallet {
 				is_watched: true,
 			};
 
-			if let Some(existing_viewer) = Self::user_vine_storage(viewer_id) {
-				let mut vines = existing_viewer.watched_vines;
-				for vine in vines.iter_mut() {
-					if vine.vine_id != vine_id {
-						vines.push(new_watched_vine.clone());
-						break;
-					} else {
-						Err(Error::<T>::RewardsAlreadyReceived)?;
-					}
-				}
-				VineStorageByUser::<T>::insert(viewer_id, existing_viewer);
-			} else {
-				let new_user_watched_data = UserVines::<T> {
-					user: curr_user,
-					created_vines: Vec::<Vine<T>>::new(),
-					watched_vines: vec![new_watched_vine],
-				};
-				VineStorageByUser::<T>::insert(viewer_id, new_user_watched_data);
-			}
-
-			// if let Some(ref mut vines) = curr_user_vine.watched_vines {
+			// if let Some(existing_viewer) = Self::user_vine_storage(viewer_id) {
+			// 	let mut vines = existing_viewer.watched_vines;
 			// 	for vine in vines.iter_mut() {
 			// 		if vine.vine_id != vine_id {
 			// 			vines.push(new_watched_vine.clone());
@@ -278,10 +276,29 @@ pub mod pallet {
 			// 			Err(Error::<T>::RewardsAlreadyReceived)?;
 			// 		}
 			// 	}
+			// 	VineStorageByUser::<T>::insert(viewer_id, existing_viewer);
 			// } else {
-			// 	curr_user_vine.watched_vines = Some(vec![new_watched_vine]);
+			// 	let new_user_watched_data = UserVines::<T> {
+			// 		user: curr_user,
+			// 		created_vines: Vec::<Vine<T>>::new(),
+			// 		watched_vines: vec![new_watched_vine],
+			// 	};
+			// 	VineStorageByUser::<T>::insert(viewer_id, new_user_watched_data);
 			// }
-			// VineStorageByUser::<T>::insert(viewer_id, curr_user_vine);
+
+			if let Some(ref mut vines) = curr_user_vine.watched_vines {
+				for vine in vines.iter_mut() {
+					if vine.vine_id != vine_id {
+						vines.push(new_watched_vine.clone());
+						break;
+					} else {
+						Err(Error::<T>::RewardsAlreadyReceived)?;
+					}
+				}
+			} else {
+				curr_user_vine.watched_vines = Some(vec![new_watched_vine]);
+			}
+			VineStorageByUser::<T>::insert(viewer_id, curr_user_vine);
 
 			// update all_vines storage
 			let updated_user_vine = Self::user_vine_storage(viewer_id).unwrap();

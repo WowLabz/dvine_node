@@ -406,8 +406,8 @@ impl orml_nft::Config for Runtime {
 	type TokenId = u64;
 	// type ClassData = orml_traits::ClassData<BlockNumber>;
 	// type TokenData = orml_traits::TokenData<AccountId, BlockNumber>;
-	type ClassData = ();
-	type TokenData = ();
+	type ClassData = pallet_user::ClassData;
+	type TokenData = pallet_user::TokenData;
 	type MaxClassMetadata = MaxClassMetadata;
 	type MaxTokenMetadata = MaxTokenMetadata;
 }
