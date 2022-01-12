@@ -1,6 +1,6 @@
 use dvine_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig, TokensConfig,
-	SystemConfig, WASM_BINARY,
+	SystemConfig, WASM_BINARY, OrmlNFTConfig,
 };
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -161,5 +161,6 @@ fn testnet_genesis(
 		},
 		assets: Default::default(),
 		tokens: TokensConfig { balances: vec![] },
+		orml_nft: OrmlNFTConfig {tokens: vec![] },
 	}
 }
