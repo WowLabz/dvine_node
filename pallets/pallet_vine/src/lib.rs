@@ -292,23 +292,8 @@ pub mod pallet {
 				VineStorageByUser::<T>::insert(viewer_id, new_user_watched_data);
 			}
 
-			// if let Some(ref mut vines) = curr_user_vine.watched_vines {
-			// 	for vine in vines.iter_mut() {
-			// 		if vine.vine_id != vine_id {
-			// 			vines.push(new_watched_vine.clone());
-			// 			break;
-			// 		} else {
-			// 			Err(Error::<T>::RewardsAlreadyReceived)?;
-			// 		}
-			// 	}
-			// } else {
-			// 	curr_user_vine.watched_vines = Some(vec![new_watched_vine]);
-			// }
-			// VineStorageByUser::<T>::insert(viewer_id, curr_user_vine);
-
 			// update all_vines storage
 			let updated_user_vine = Self::user_vine_storage(viewer_id).unwrap();
-
 			Self::update_all_vine_storage_vec(updated_user_vine);
 
 			Ok(())
@@ -358,13 +343,6 @@ pub mod pallet {
 			all_vines: Vec<UserVines<T>>,
 			vine_id: VineId,
 		) -> Result<UserVines<T>, Error<T>> {
-			// all_vines
-			// 	.into_iter()
-			// 	.find(|vine| {
-			// 		vine.created_vines.iter().find(|c_vine| c_vine.vine_id == vine_id) != None
-			// 	})
-			// 	.ok_or(Error::<T>::VineDoesNotExist)
-
 			for vine in all_vines.into_iter() {
 				if let Some(ref c_vine_vec) = vine.created_vines {
 					for c_vine in c_vine_vec {
