@@ -59,6 +59,10 @@ version = '1.0.0'
 default-features = false
 version = '0.4.14'
 
+[dependencies.serde]
+default-features = false
+version = "1.0.133"
+
 [dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'

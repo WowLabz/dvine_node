@@ -1,10 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use frame_support::pallet_prelude::*;
+use frame_system::pallet_prelude::*;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
-
+use pallet_user::{User, UserId};
+use scale_info::TypeInfo;
+use serde::{Deserialize, Serialize};
+use frame_support::inherent::Vec;
 // #[cfg(test)]
 // mod mock;
 
@@ -14,35 +19,44 @@ pub use pallet::*;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+pub type VineMetaData = Vec<u8>;
+
+#[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct ClassData<Balance> {
+	pub deposit: Balance,
+	pub collection_name: VineMetaData,
+	pub description: VineMetaData,
+	pub thumbnail_image: VineMetaData,
+}
+
+#[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub struct TokenData {
+	pub create_block: u32,
+}
+
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::pallet_prelude::*;
+	use super::*;
 	use frame_support::{
 		dispatch::DispatchResult,
 		inherent::Vec,
-		pallet_prelude::Encode,
-		traits::{Currency, ExistenceRequirement, Get, Randomness},
+		traits::{Currency, ExistenceRequirement, Get, Randomness, ReservableCurrency},
 		transactional, PalletId,
 	};
 	use frame_system::pallet_prelude::*;
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
-	use pallet_user::{ClassData, User, UserId};
 	use scale_info::prelude::vec;
-	use scale_info::{prelude::boxed::Box, TypeInfo};
-	use sp_io::hashing::blake2_128;
-	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
-	use sp_std::slice::IterMut;
+	// use sp_io::hashing::blake2_128;
+	use sp_runtime::traits::SaturatedConversion;
 
 	type BalanceOf<T> =
-		<<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::Balance;
+		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	type AccountOf<T> = <T as frame_system::Config>::AccountId;
-	type CurrencyIdOf<T> = <<T as Config>::Currency as MultiCurrency<
-		<T as frame_system::Config>::AccountId,
-	>>::CurrencyId;
 	pub type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
 	pub type TokenIdOf<T> = <T as orml_nft::Config>::TokenId;
 	pub type ClassIdOf<T> = <T as orml_nft::Config>::ClassId;
-
 	pub type VineId = u64;
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
@@ -83,19 +97,24 @@ pub mod pallet {
 	pub trait Config:
 		frame_system::Config
 		+ pallet_user::Config
-		+ orml_nft::Config<TokenData = pallet_user::TokenData, ClassData = pallet_user::ClassData>
+		+ orml_nft::Config<TokenData = TokenData, ClassData = ClassData<BalanceOf<Self>>>
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 
-		/// The Currency handler for the vines pallet.
-		type Currency: MultiReservableCurrency<Self::AccountId>;
-
-		/// The native currency.
-		type GetNativeCurrencyId: Get<CurrencyIdOf<Self>>;
+		/// Currency type for reserve/unreserve balance
+		type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
 
 		/// The module/pallet identifier.
 		type PalletId: Get<PalletId>;
+
+		/// The minimum balance to create class
+		#[pallet::constant]
+		type CreateCollectionDeposit: Get<BalanceOf<Self>>;
+
+		/// The minimum balance to create token
+		#[pallet::constant]
+		type CreateNftDeposit: Get<BalanceOf<Self>>;
 	}
 
 	#[pallet::pallet]
@@ -136,10 +155,32 @@ pub mod pallet {
 		RewardsAlreadyReceived,
 		/// Error when the creator is calculate rewards for his own viewing
 		CreatorCantBeViewer,
+		/// Class of nft already exists
+		CollectionAlreadyExists,
+		/// Deposit for class or nft is below minimum
+		DepositTooLow,
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn create_collection(
+			origin: OriginFor<T>,
+			class_data: ClassData<BalanceOf<T>>,
+		) -> DispatchResult {
+			let creator = ensure_signed(origin)?;
+
+			ensure!(class_data.deposit >= T::CreateCollectionDeposit::get(), Error::<T>::DepositTooLow);
+
+			let next_class_id = <orml_nft::NextClassId::<T>>::get();
+			log::info!("class_id: {:#?}", next_class_id.clone());
+
+			// let nft_account = T::PalletId::get().into_sub_account(next_class_id);
+			// T::Currency::transfer()
+
+			Ok(())
+		}
+
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_vine(
 			origin: OriginFor<T>,
@@ -153,14 +194,14 @@ pub mod pallet {
 			let curr_user =
 				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
 
-			let data: ClassData = ClassData { create_block: 1u32 };
+			// let data: ClassData = ClassData { create_block: 1u32 };
 
-			let x: TokenIdOf<T> = 1u32.into();
-			let y: ClassIdOf<T> = 1u32.into();
-			let z = orml_nft::Pallet::<T>::is_owner(&creator, (y, x));
-			log::info!("test orml_nft: {}", z);
+			// let x: TokenIdOf<T> = 1u32.into();
+			// let y: ClassIdOf<T> = 1u32.into();
+			// let z = orml_nft::Pallet::<T>::is_owner(&creator, (y, x));
+			// log::info!("test orml_nft: {}", z);
 
-			let u = orml_nft::Pallet::<T>::create_class(&creator, b"metadata".to_vec(), data)?;
+			// let u = orml_nft::Pallet::<T>::create_class(&creator, b"metadata".to_vec(), data)?;
 
 			let vine_count = Self::increment_vine_counter();
 

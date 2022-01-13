@@ -59,10 +59,6 @@ default-features = false
 path = "../traits"
 version = '0.4.1-dev'
 
-[dependencies.serde]
-default-features = false
-version = "1.0.133"
-
 [dev-dependencies.sp-core]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'

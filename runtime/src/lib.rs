@@ -395,8 +395,8 @@ impl orml_currencies::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MaxClassMetadata: u32 = 10000;
-	pub const MaxTokenMetadata: u32 = 10000;
+	pub const MaxClassMetadata: u32 = 1024;
+	pub const MaxTokenMetadata: u32 = 1024;
 	//pub const ClassId: u32 = 1;
 	//pub const TokenId: u32 = 1;
 }
@@ -404,10 +404,8 @@ parameter_types! {
 impl orml_nft::Config for Runtime {
 	type ClassId = u64;
 	type TokenId = u64;
-	// type ClassData = orml_traits::ClassData<BlockNumber>;
-	// type TokenData = orml_traits::TokenData<AccountId, BlockNumber>;
-	type ClassData = pallet_user::ClassData;
-	type TokenData = pallet_user::TokenData;
+	type ClassData = pallet_vine::ClassData<Balance>;
+	type TokenData = pallet_vine::TokenData;
 	type MaxClassMetadata = MaxClassMetadata;
 	type MaxTokenMetadata = MaxTokenMetadata;
 }
@@ -427,11 +425,17 @@ impl pallet_user::Config for Runtime {
 	type PalletId = BondingCurvePalletId;
 }
 
+parameter_types! {
+	pub const CreateCollectionDeposit: Balance = 1;
+	pub const CreateNftDeposit: Balance = 1;
+}
+
 impl pallet_vine::Config for Runtime {
 	type Event = Event;
-	type Currency = Currencies;
-	type GetNativeCurrencyId = GetNativeCurrencyId;
+	type Currency = Balances;
 	type PalletId = BondingCurvePalletId;
+	type CreateCollectionDeposit = CreateCollectionDeposit;
+	type CreateNftDeposit = CreateNftDeposit;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
