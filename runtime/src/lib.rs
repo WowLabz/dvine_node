@@ -426,8 +426,8 @@ impl pallet_user::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CreateCollectionDeposit: Balance = 1;
-	pub const CreateNftDeposit: Balance = 1;
+	pub const CreateCollectionDeposit: Balance = 10000;
+	pub const CreateNftDeposit: Balance = 10000;
 }
 
 impl pallet_vine::Config for Runtime {

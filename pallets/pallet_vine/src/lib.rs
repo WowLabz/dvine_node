@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use frame_support::inherent::Vec;
 use frame_support::pallet_prelude::*;
 use frame_system::pallet_prelude::*;
 /// Edit this file to define custom logic or remove it if it is not needed.
@@ -9,7 +10,6 @@ pub use pallet::*;
 use pallet_user::{User, UserId};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use frame_support::inherent::Vec;
 // #[cfg(test)]
 // mod mock;
 
@@ -28,6 +28,7 @@ pub struct ClassData<Balance> {
 	pub collection_name: VineMetaData,
 	pub description: VineMetaData,
 	pub thumbnail_image: VineMetaData,
+	pub metadata: VineMetaData,
 }
 
 #[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
@@ -49,7 +50,7 @@ pub mod pallet {
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
 	use scale_info::prelude::vec;
 	// use sp_io::hashing::blake2_128;
-	use sp_runtime::traits::SaturatedConversion;
+	use sp_runtime::traits::{SaturatedConversion, AccountIdConversion};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -141,6 +142,8 @@ pub mod pallet {
 		VineCreated(UserId, VineId),
 		/// [UserId, VineId]
 		VineViewed(UserId, VineId),
+		/// [Creator, ClassId, ClassName]
+		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData)
 	}
 
 	#[pallet::error]
@@ -166,19 +169,42 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_collection(
 			origin: OriginFor<T>,
-			class_data: ClassData<BalanceOf<T>>,
-		) -> DispatchResult {
+			collection_name: VineMetaData,
+			description: VineMetaData,
+			thumbnail_image: VineMetaData,
+			metadata: VineMetaData,
+		) -> DispatchResultWithPostInfo {
 			let creator = ensure_signed(origin)?;
 
-			ensure!(class_data.deposit >= T::CreateCollectionDeposit::get(), Error::<T>::DepositTooLow);
-
-			let next_class_id = <orml_nft::NextClassId::<T>>::get();
+			let next_class_id = <orml_nft::NextClassId<T>>::get();
 			log::info!("class_id: {:#?}", next_class_id.clone());
 
-			// let nft_account = T::PalletId::get().into_sub_account(next_class_id);
-			// T::Currency::transfer()
+			let nft_account = <T as pallet::Config>::PalletId::get().into_sub_account(next_class_id);
+			// Secure deposit of token class owner
+			let collection_deposit = T::CreateCollectionDeposit::get();
+			// Transfer fund to pot
+			<T as pallet::Config>::Currency::transfer(
+				&creator,
+				&nft_account,
+				collection_deposit,
+				ExistenceRequirement::KeepAlive,
+			)?;
+			// Reserve pot fund
+			<T as pallet::Config>::Currency::reserve(&nft_account, <T as pallet::Config>::Currency::free_balance(&nft_account))?;
 
-			Ok(())
+			let new_class_data = ClassData {
+				deposit: collection_deposit,
+				collection_name: collection_name.clone(),
+				description,
+				thumbnail_image,
+				metadata: metadata.clone(),
+			};
+
+			orml_nft::Pallet::<T>::create_class(&creator, metadata, new_class_data)?;
+			
+			Self::deposit_event(Event::<T>::NewNftCollectionCreated(creator, next_class_id, collection_name));
+
+			Ok(().into())
 		}
 
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
