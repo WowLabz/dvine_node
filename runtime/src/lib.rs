@@ -405,7 +405,7 @@ impl orml_nft::Config for Runtime {
 	type ClassId = u64;
 	type TokenId = u64;
 	type ClassData = pallet_vine::ClassData<Balance>;
-	type TokenData = pallet_vine::TokenData;
+	type TokenData = pallet_vine::VineData<AccountId>;
 	type MaxClassMetadata = MaxClassMetadata;
 	type MaxTokenMetadata = MaxTokenMetadata;
 }

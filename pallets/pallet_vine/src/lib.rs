@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 mod benchmarking;
 
 pub type VineMetaData = Vec<u8>;
+pub type VineId = u64;
 
 #[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
@@ -33,8 +34,18 @@ pub struct ClassData<Balance> {
 
 #[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct TokenData {
-	pub create_block: u32,
+pub struct VineData<AccountId> {
+	pub user_id: UserId,
+	pub vine_id: VineId,
+	pub vine_creator: AccountId,
+	pub video_url: VineMetaData,
+	pub thumbnail_image: VineMetaData,
+	pub vine_description: VineMetaData,
+	pub view_count: u64,
+	pub share_count: u64,
+	pub comment_count: u64,
+	pub did_view: bool,
+	pub metadata: VineMetaData,
 }
 
 #[frame_support::pallet]
@@ -50,7 +61,7 @@ pub mod pallet {
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
 	use scale_info::prelude::vec;
 	// use sp_io::hashing::blake2_128;
-	use sp_runtime::traits::{SaturatedConversion, AccountIdConversion};
+	use sp_runtime::traits::{AccountIdConversion, SaturatedConversion};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -58,7 +69,6 @@ pub mod pallet {
 	pub type BlockNumberOf<T> = <T as frame_system::Config>::BlockNumber;
 	pub type TokenIdOf<T> = <T as orml_nft::Config>::TokenId;
 	pub type ClassIdOf<T> = <T as orml_nft::Config>::ClassId;
-	pub type VineId = u64;
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
@@ -81,6 +91,7 @@ pub mod pallet {
 		pub share_count: u64,
 		pub comment_count: u64,
 		pub did_view: bool,
+		pub metadata: VineMetaData,
 	}
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
@@ -98,7 +109,7 @@ pub mod pallet {
 	pub trait Config:
 		frame_system::Config
 		+ pallet_user::Config
-		+ orml_nft::Config<TokenData = TokenData, ClassData = ClassData<BalanceOf<Self>>>
+		+ orml_nft::Config<TokenData = VineData<AccountOf<Self>>, ClassData = ClassData<BalanceOf<Self>>>
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
@@ -135,15 +146,20 @@ pub mod pallet {
 	pub type VineStorageByUser<T: Config> =
 		StorageMap<_, Twox64Concat, UserId, UserVines<T>, OptionQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn get_vines)]
+	pub type Vines<T: Config> =
+		StorageMap<_, Twox64Concat, VineId, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// [UserId, VineId]
-		VineCreated(UserId, VineId),
+		/// [UserId, VineId, CollectionId, TokenId]
+		VineCreated(UserId, VineId, ClassIdOf<T>, TokenIdOf<T>),
 		/// [UserId, VineId]
 		VineViewed(UserId, VineId),
-		/// [Creator, ClassId, ClassName]
-		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData)
+		/// [Creator, CollectionId, ClassName]
+		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData),
 	}
 
 	#[pallet::error]
@@ -162,6 +178,10 @@ pub mod pallet {
 		CollectionAlreadyExists,
 		/// Deposit for class or nft is below minimum
 		DepositTooLow,
+		/// Collection does not exist
+		CollectionDoesNotExist,
+		/// Not authorized
+		NoPermission,
 	}
 
 	#[pallet::call]
@@ -169,6 +189,7 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_collection(
 			origin: OriginFor<T>,
+			user_id: UserId,
 			collection_name: VineMetaData,
 			description: VineMetaData,
 			thumbnail_image: VineMetaData,
@@ -176,10 +197,14 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			let creator = ensure_signed(origin)?;
 
+			let curr_user =
+				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
+
 			let next_class_id = <orml_nft::NextClassId<T>>::get();
 			log::info!("class_id: {:#?}", next_class_id.clone());
 
-			let nft_account = <T as pallet::Config>::PalletId::get().into_sub_account(next_class_id);
+			let nft_account =
+				<T as pallet::Config>::PalletId::get().into_sub_account(next_class_id);
 			// Secure deposit of token class owner
 			let collection_deposit = T::CreateCollectionDeposit::get();
 			// Transfer fund to pot
@@ -190,7 +215,10 @@ pub mod pallet {
 				ExistenceRequirement::KeepAlive,
 			)?;
 			// Reserve pot fund
-			<T as pallet::Config>::Currency::reserve(&nft_account, <T as pallet::Config>::Currency::free_balance(&nft_account))?;
+			<T as pallet::Config>::Currency::reserve(
+				&nft_account,
+				<T as pallet::Config>::Currency::free_balance(&nft_account),
+			)?;
 
 			let new_class_data = ClassData {
 				deposit: collection_deposit,
@@ -201,8 +229,12 @@ pub mod pallet {
 			};
 
 			orml_nft::Pallet::<T>::create_class(&creator, metadata, new_class_data)?;
-			
-			Self::deposit_event(Event::<T>::NewNftCollectionCreated(creator, next_class_id, collection_name));
+
+			Self::deposit_event(Event::<T>::NewNftCollectionCreated(
+				creator,
+				next_class_id,
+				collection_name,
+			));
 
 			Ok(().into())
 		}
@@ -211,30 +243,42 @@ pub mod pallet {
 		pub fn create_vine(
 			origin: OriginFor<T>,
 			user_id: UserId,
-			vine_description: Vec<u8>,
-			video_url: Vec<u8>,
-			thumbnail_image: Vec<u8>,
+			collection_id: ClassIdOf<T>,
+			vine_description: VineMetaData,
+			video_url: VineMetaData,
+			thumbnail_image: VineMetaData,
+			metadata: VineMetaData,
 		) -> DispatchResult {
 			let creator = ensure_signed(origin)?;
 
 			let curr_user =
 				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
 
-			// let data: ClassData = ClassData { create_block: 1u32 };
+			let collection_info = <orml_nft::Classes<T>>::get(collection_id)
+				.ok_or(Error::<T>::CollectionDoesNotExist)?;
 
-			// let x: TokenIdOf<T> = 1u32.into();
-			// let y: ClassIdOf<T> = 1u32.into();
-			// let z = orml_nft::Pallet::<T>::is_owner(&creator, (y, x));
-			// log::info!("test orml_nft: {}", z);
+			ensure!(creator == collection_info.owner, Error::<T>::NoPermission);
 
-			// let u = orml_nft::Pallet::<T>::create_class(&creator, b"metadata".to_vec(), data)?;
+			let asset_deposit = T::CreateNftDeposit::get();
+			let nft_account =
+				<T as pallet::Config>::PalletId::get().into_sub_account(collection_id);
+
+			// Transfer fund to pot
+			<T as pallet::Config>::Currency::transfer(
+				&creator,
+				&nft_account,
+				asset_deposit,
+				ExistenceRequirement::KeepAlive,
+			)?;
+			// Reserve pot fund
+			<T as pallet::Config>::Currency::reserve(&nft_account, asset_deposit)?;
 
 			let vine_count = Self::increment_vine_counter();
 
-			let new_vine = Vine::<T> {
+			let new_vine = VineData {
 				user_id,
 				vine_id: vine_count,
-				vine_creator: creator,
+				vine_creator: creator.clone(),
 				video_url,
 				thumbnail_image,
 				vine_description,
@@ -242,27 +286,41 @@ pub mod pallet {
 				share_count: Default::default(),
 				comment_count: Default::default(),
 				did_view: Default::default(),
+				metadata: metadata.clone(),
 			};
 
-			if let Some(mut curr_user_vine) = Self::user_vine_storage(user_id) {
-				if let Some(ref mut c_vine) = curr_user_vine.created_vines {
-					c_vine.push(new_vine.clone());
-					VineStorageByUser::<T>::insert(user_id, curr_user_vine);
-				}
-			} else {
-				let new_user_vines = UserVines::<T> {
-					user: curr_user,
-					created_vines: Some(vec![new_vine.clone()]),
-					watched_vines: None,
-				};
+			let token_id = orml_nft::Pallet::<T>::mint(
+				&creator,
+				collection_id,
+				metadata.clone(),
+				new_vine.clone(),
+			)?;
+			Vines::<T>::insert(vine_count, (collection_id.clone(), token_id.clone()));
 
-				VineStorageByUser::<T>::insert(user_id, new_user_vines);
-			}
+			// if let Some(mut curr_user_vine) = Self::user_vine_storage(user_id) {
+			// 	if let Some(ref mut c_vine) = curr_user_vine.created_vines {
+			// 		c_vine.push(new_vine.clone());
+			// 		VineStorageByUser::<T>::insert(user_id, curr_user_vine);
+			// 	}
+			// } else {
+			// 	let new_user_vines = UserVines::<T> {
+			// 		user: curr_user,
+			// 		created_vines: Some(vec![new_vine.clone()]),
+			// 		watched_vines: None,
+			// 	};
 
-			let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
-			Self::update_all_vine_storage_vec(updated_user_vine);
+			// 	VineStorageByUser::<T>::insert(user_id, new_user_vines);
+			// }
 
-			Self::deposit_event(Event::<T>::VineCreated(user_id, vine_count));
+			// let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
+			// Self::update_all_vine_storage_vec(updated_user_vine);
+
+			Self::deposit_event(Event::<T>::VineCreated(
+				user_id,
+				vine_count,
+				collection_id,
+				token_id,
+			));
 			Ok(())
 		}
 
