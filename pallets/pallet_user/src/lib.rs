@@ -293,104 +293,108 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// pub fn sell_user_token(
-		// 	origin: OriginFor<T>,
-		// 	token_id: CurrencyIdOf<T>,
-		// 	amount: BalanceOf<T>,
-		// ) -> DispatchResult {
-		// 	let seller = ensure_signed(origin)?;
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn sell_user_token(
+			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let seller = ensure_signed(origin)?;
 
-		// 	let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let curr_token_info = token.token_info.ok_or(Error::<T>::TokenDoesNotExist)?;
 
-		// 	T::Currency::ensure_can_withdraw(token_id, &seller, amount)?;
+			T::Currency::ensure_can_withdraw(token_id, &seller, amount)?;
 
-		// 	let total_issuance = T::Currency::total_issuance(token_id);
-		// 	let issuance_after = total_issuance - amount;
+			let total_issuance = T::Currency::total_issuance(token_id);
+			let issuance_after = total_issuance - amount;
 
-		// 	let curve_config = token.token_info.curve_type.get_curve_config();
-		// 	log::info!("curve_config: {:#?}", curve_config);
+			let curve_config = curr_token_info.curve_type.get_curve_config();
+			log::info!("curve_config: {:#?}", curve_config);
 
-		// 	let integral_before: BalanceOf<T> =
-		// 		curve_config.integral(total_issuance.saturated_into::<u128>()).saturated_into();
-		// 	let integral_after: BalanceOf<T> =
-		// 		curve_config.integral(issuance_after.saturated_into::<u128>()).saturated_into();
+			let integral_before: BalanceOf<T> =
+				curve_config.integral(total_issuance.saturated_into::<u128>()).saturated_into();
+			let integral_after: BalanceOf<T> =
+				curve_config.integral(issuance_after.saturated_into::<u128>()).saturated_into();
 
-		// 	let return_amount = integral_before - integral_after;
-		// 	log::info!(
-		// 		"return amount selling {:#?} tokens is {:#?}",
-		// 		amount,
-		// 		return_amount.clone()
-		// 	);
+			let return_amount = integral_before - integral_after;
+			log::info!(
+				"return amount selling {:#?} tokens is {:#?}",
+				amount,
+				return_amount.clone()
+			);
 
-		// 	let token_account = T::PalletId::get().into_sub_account(token.token_info.curve_id);
+			let token_account = T::PalletId::get().into_sub_account(curr_token_info.curve_id);
 
-		// 	T::Currency::withdraw(token_id, &seller, amount)?;
+			T::Currency::withdraw(token_id, &seller, amount)?;
 
-		// 	T::Currency::transfer(
-		// 		T::GetNativeCurrencyId::get(),
-		// 		&token_account,
-		// 		&seller,
-		// 		return_amount,
-		// 	)?;
+			T::Currency::transfer(
+				T::GetNativeCurrencyId::get(),
+				&token_account,
+				&seller,
+				return_amount,
+			)?;
 
-		// 	Self::deposit_event(Event::TokenBurn(seller, token_id, amount, return_amount));
-		// 	Ok(())
-		// }
+			Self::deposit_event(Event::TokenBurn(seller, token_id, amount, return_amount));
+			Ok(())
+		}
 
-		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// pub fn user_token_spot_price(
-		// 	origin: OriginFor<T>,
-		// 	token_id: CurrencyIdOf<T>,
-		// ) -> DispatchResult {
-		// 	let _user = ensure_signed(origin)?;
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn user_token_spot_price(
+			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+		) -> DispatchResult {
+			let _user = ensure_signed(origin)?;
 
-		// 	let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
-		// 	let curve_config = token.token_info.curve_type.get_curve_config();
-		// 	let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
-		// 	log::info!("Total Issuance of the asset {:?}", total_issuance);
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let curr_token_info = token.token_info.ok_or(Error::<T>::TokenDoesNotExist)?;
+			let curve_config = curr_token_info.curve_type.get_curve_config();
+			let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
+			log::info!("Total Issuance of the asset {:?}", total_issuance);
 
-		// 	let current_price: u128 = curve_config.integral(total_issuance);
-		// 	let spot_price: BalanceOf<T> = (current_price / total_issuance).saturated_into();
-		// 	log::info!("spot price: {:#?}", current_price.clone());
-		// 	log::info!(
-		// 		"actual spot price{:?}",
-		// 		current_price.clone().saturated_into::<u128>() / total_issuance.clone()
-		// 	);
+			let current_price: u128 = curve_config.integral(total_issuance);
+			let spot_price: BalanceOf<T> = (current_price / total_issuance).saturated_into();
+			log::info!("spot price: {:#?}", current_price.clone());
+			log::info!(
+				"actual spot price{:?}",
+				current_price.clone().saturated_into::<u128>() / total_issuance.clone()
+			);
 
-		// 	<TokenSpotPrice<T>>::insert(token_id.clone(), spot_price);
+			<TokenSpotPrice<T>>::insert(token_id.clone(), spot_price);
 
-		// 	Self::deposit_event(Event::TokenSpotPrice(token_id, spot_price));
-		// 	Ok(())
-		// }
+			Self::deposit_event(Event::TokenSpotPrice(token_id, spot_price));
+			Ok(())
+		}
 
-		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// pub fn user_token_airdrop(
-		// 	origin: OriginFor<T>,
-		// 	token_id: CurrencyIdOf<T>,
-		// 	beneficiaries: Vec<AccountOf<T>>,
-		// 	amount: BalanceOf<T>,
-		// ) -> DispatchResult {
-		// 	let _caller = ensure_signed(origin)?;
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn user_token_airdrop(
+			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+			beneficiaries: Vec<AccountOf<T>>,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let _caller = ensure_signed(origin)?;
 
-		// 	let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
-		// 	let total_withdraw_amount: BalanceOf<T> =
-		// 		(amount.saturated_into::<u128>() * beneficiaries.len() as u128).saturated_into();
-		// 	log::info!("airdrop total_withdraw_amount: {:#?}", total_withdraw_amount);
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let curr_token_info = token.token_info.ok_or(Error::<T>::TokenDoesNotExist)?;
 
-		// 	for beneficiary in &beneficiaries {
-		// 		T::Currency::deposit(token_id, beneficiary, amount)?;
-		// 	}
+			let total_withdraw_amount: BalanceOf<T> =
+				(amount.saturated_into::<u128>() * beneficiaries.len() as u128).saturated_into();
+			log::info!("airdrop total_withdraw_amount: {:#?}", total_withdraw_amount);
 
-		// 	Self::deposit_event(Event::UserTokensAirDropped(
-		// 		token_id,
-		// 		amount,
-		// 		token.token_info.creator,
-		// 		beneficiaries.clone(),
-		// 	));
+			for beneficiary in &beneficiaries {
+				T::Currency::deposit(token_id, beneficiary, amount)?;
+			}
 
-		// 	Ok(())
-		// }
+			Self::deposit_event(Event::UserTokensAirDropped(
+				token_id,
+				amount,
+				curr_token_info.creator,
+				beneficiaries.clone(),
+			));
+
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
