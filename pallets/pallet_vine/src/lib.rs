@@ -158,7 +158,7 @@ pub mod pallet {
 		VineCreated(UserId, VineId, ClassIdOf<T>, TokenIdOf<T>),
 		/// [UserId, VineId]
 		VineViewed(UserId, VineId),
-		/// [Creator, CollectionId, ClassName]
+		/// [Creator, CollectionId, CollectionName]
 		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData),
 	}
 

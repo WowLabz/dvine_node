@@ -244,53 +244,54 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		// pub fn buy_user_token(
-		// 	origin: OriginFor<T>,
-		// 	token_id: CurrencyIdOf<T>,
-		// 	amount: BalanceOf<T>,
-		// ) -> DispatchResult {
-		// 	let buyer = ensure_signed(origin)?;
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn buy_user_token(
+			origin: OriginFor<T>,
+			token_id: CurrencyIdOf<T>,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			let buyer = ensure_signed(origin)?;
 
-		// 	let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let token = Self::token_storage(token_id).ok_or(<Error<T>>::TokenDoesNotExist)?;
+			let curr_token_info = token.token_info.ok_or(Error::<T>::TokenDoesNotExist)?;
 
-		// 	let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
-		// 	log::info!("total issuance {:#?}", total_issuance.clone());
+			let total_issuance = T::Currency::total_issuance(token_id).saturated_into::<u128>();
+			log::info!("total issuance {:#?}", total_issuance.clone());
 
-		// 	let issuance_after = total_issuance + amount.saturated_into::<u128>();
-		// 	ensure!(
-		// 		issuance_after <= token.token_info.max_supply.saturated_into::<u128>(),
-		// 		Error::<T>::TokenMaxSupplyExceeded,
-		// 	);
+			let issuance_after = total_issuance + amount.saturated_into::<u128>();
+			ensure!(
+				issuance_after <= curr_token_info.max_supply.saturated_into::<u128>(),
+				Error::<T>::TokenMaxSupplyExceeded,
+			);
 
-		// 	let curve_config = token.token_info.curve_type.get_curve_config();
-		// 	log::info!("curve_config: {:#?}", curve_config);
+			let curve_config = curr_token_info.curve_type.get_curve_config();
+			log::info!("curve_config: {:#?}", curve_config);
 
-		// 	let integral_before: BalanceOf<T> =
-		// 		curve_config.integral(total_issuance).saturated_into();
-		// 	let integral_after: BalanceOf<T> =
-		// 		curve_config.integral(issuance_after).saturated_into();
+			let integral_before: BalanceOf<T> =
+				curve_config.integral(total_issuance).saturated_into();
+			let integral_after: BalanceOf<T> =
+				curve_config.integral(issuance_after).saturated_into();
 
-		// 	let cost = integral_after - integral_before;
-		// 	log::info!("cost to buy {:#?} tokens is {:#?}", amount, cost.clone());
+			let cost = integral_after - integral_before;
+			log::info!("cost to buy {:#?} tokens is {:#?}", amount, cost.clone());
 
-		// 	ensure!(
-		// 		T::Currency::free_balance(T::GetNativeCurrencyId::get(), &buyer) >= cost.into(),
-		// 		Error::<T>::InsufficentBalanceForPurchase,
-		// 	);
+			ensure!(
+				T::Currency::free_balance(T::GetNativeCurrencyId::get(), &buyer) >= cost.into(),
+				Error::<T>::InsufficentBalanceForPurchase,
+			);
 
-		// 	let token_account = T::PalletId::get().into_sub_account(token.token_info.curve_id);
+			let token_account = T::PalletId::get().into_sub_account(curr_token_info.curve_id);
 
-		// 	// Transfer the network tokens from the buyers' acoount
-		// 	// to the admin account
-		// 	T::Currency::transfer(T::GetNativeCurrencyId::get(), &buyer, &token_account, cost)?;
+			// Transfer the network tokens from the buyers' acoount
+			// to the admin account
+			T::Currency::transfer(T::GetNativeCurrencyId::get(), &buyer, &token_account, cost)?;
 
-		// 	// Deposit the creator tokens to the buyer's acoount
-		// 	T::Currency::deposit(token_id, &buyer, amount)?;
+			// Deposit the creator tokens to the buyer's acoount
+			T::Currency::deposit(token_id, &buyer, amount)?;
 
-		// 	Self::deposit_event(Event::TokenMint(buyer, token_id, amount, cost));
-		// 	Ok(())
-		// }
+			Self::deposit_event(Event::TokenMint(buyer, token_id, amount, cost));
+			Ok(())
+		}
 
 		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		// pub fn sell_user_token(
