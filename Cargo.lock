@@ -4086,6 +4086,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "hex-literal",
  "log",
  "orml-nft",
  "orml-traits",
@@ -4095,6 +4096,7 @@ dependencies = [
  "serde",
  "sp-core",
  "sp-io",
+ "sp-keyring",
  "sp-runtime",
  "sp-std",
 ]

@@ -63,6 +63,25 @@ version = '0.4.14'
 default-features = false
 version = "1.0.133"
 
+[dependencies.hex-literal]
+optional = true
+version = '0.3.1'
+
+[dependencies.sp-keyring]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
+
+[dependencies.sp-core]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+branch = "polkadot-v0.9.12"
+
+# [dependencies.node-testing]
+# default-features = false
+# git = 'https://github.com/paritytech/substrate.git'
+# branch = "polkadot-v0.9.12"
+
 [dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -92,6 +111,7 @@ branch = "polkadot-v0.9.12"
 default = ['std']
 runtime-benchmarks = ['frame-benchmarking']
 std = [
+    'hex-literal',
     'codec/std',
     'scale-info/std',
     'frame-support/std',

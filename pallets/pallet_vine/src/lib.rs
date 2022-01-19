@@ -61,7 +61,12 @@ pub mod pallet {
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
 	use scale_info::prelude::vec;
 	// use sp_io::hashing::blake2_128;
-	use sp_runtime::traits::{AccountIdConversion, SaturatedConversion};
+	use sp_core::{crypto::Ss58Codec, Pair};
+	use sp_runtime::{
+		traits::{AccountIdConversion, SaturatedConversion, Verify},
+		AccountId32, MultiSignature,
+	};
+	use std::str::FromStr;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -136,6 +141,7 @@ pub mod pallet {
 
 		// DummyAccountWithBalanceForTest Account Id
 		// type DummyAccountWithBalanceForTest: Get<<Self as frame_system::Config>::AccountId>;
+		// type DummyAccountWithBalanceForTest: Get<AccountOf<Self>>;
 	}
 
 	#[pallet::pallet]
@@ -232,9 +238,26 @@ pub mod pallet {
 			let asset_deposit = T::CreateNftDeposit::get();
 			let total_deposit = collection_deposit + asset_deposit;
 
+			type Signature = MultiSignature;
+			type AccountPublic = <Signature as Verify>::Signer;
+
+			// let alice_acc: AccountOf<T> =
+			// 	AccountPublic::from(Pair::from_string_with_seed("//Alice", None)?.0).into();
+			// let alice_acc: AccountId32 = hex_literal::hex!(
+			// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+			// )
+			// .into();
+			// let alice_acc = Ss58Codec::from_ss58check(alice_acc)?;
+
 			// Transfer fund to pot
 			<T as pallet::Config>::Currency::transfer(
-				&creator,
+				// &hex_literal::hex!(
+				// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+				// )
+				// .into(),
+				// &node_testing::keyring::alice(),
+				&sp_keyring::sr25519::Keyring::Alice.to_account_id().to_ss58check(),
+				// &alice_acc,
 				&nft_account,
 				total_deposit,
 				ExistenceRequirement::KeepAlive,

@@ -25,10 +25,10 @@ use sp_runtime::{
 	AccountId32, ApplyExtrinsicResult, MultiSignature,
 };
 use sp_std::prelude::*;
-
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+use std::str::FromStr;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
