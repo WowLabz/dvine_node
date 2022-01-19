@@ -67,10 +67,10 @@ version = "1.0.133"
 optional = true
 version = '0.3.1'
 
-[dependencies.sp-keyring]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-branch = "polkadot-v0.9.12"
+# [dependencies.sp-keyring]
+# default-features = false
+# git = 'https://github.com/paritytech/substrate.git'
+# branch = "polkadot-v0.9.12"
 
 [dependencies.sp-core]
 default-features = false

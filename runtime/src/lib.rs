@@ -28,11 +28,10 @@ use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
-use std::str::FromStr;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
-	construct_runtime, parameter_types,
+	construct_runtime, ord_parameter_types, parameter_types,
 	traits::{
 		BalanceStatus as Status, Contains, Currency as PalletCurrency, ExistenceRequirement, Get,
 		Imbalance, KeyOwnerProofSystem, LockableCurrency as PalletLockableCurrency, Randomness,
@@ -45,7 +44,7 @@ pub use frame_support::{
 	},
 	PalletId, StorageValue,
 };
-pub use frame_system::EnsureRoot;
+pub use frame_system::{EnsureOneOf, EnsureRoot, EnsureSignedBy};
 use orml_currencies::BasicCurrencyAdapter;
 use orml_traits::{
 	arithmetic::{self, Signed},
@@ -432,13 +431,24 @@ parameter_types! {
 	// pub const AliceAccount: AccountId = AccountId::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").unwrap();
 }
 
+ord_parameter_types! {
+	pub const AliceAccount: AccountId = AccountId::from(
+		// 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+		// 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d
+		hex_literal::hex!("d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d")
+	);
+}
+
+type AliceOrigin =
+	EnsureOneOf<AccountId, EnsureRoot<AccountId>, EnsureSignedBy<AliceAccount, AccountId>>;
+
 impl pallet_vine::Config for Runtime {
 	type Event = Event;
 	type Currency = Balances;
 	type PalletId = BondingCurvePalletId;
 	type CreateCollectionDeposit = CreateCollectionDeposit;
 	type CreateNftDeposit = CreateNftDeposit;
-	// type DummyAccountWithBalanceForTest = AliceAccount;
+	type DummyAccountWithBalanceForTest = AliceAccount;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

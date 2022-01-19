@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::inherent::Vec;
-use frame_support::pallet_prelude::*;
+use frame_support::{inherent::Vec, pallet_prelude::*};
 use frame_system::pallet_prelude::*;
 /// Edit this file to define custom logic or remove it if it is not needed.
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
@@ -54,19 +53,19 @@ pub mod pallet {
 	use frame_support::{
 		dispatch::DispatchResult,
 		inherent::Vec,
-		traits::{Currency, ExistenceRequirement, Get, Randomness, ReservableCurrency},
+		traits::{
+			Currency, EnsureOrigin, ExistenceRequirement, Get, Randomness, ReservableCurrency,
+		},
 		transactional, PalletId,
 	};
 	use frame_system::pallet_prelude::*;
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
 	use scale_info::prelude::vec;
 	// use sp_io::hashing::blake2_128;
-	use sp_core::{crypto::Ss58Codec, Pair};
 	use sp_runtime::{
 		traits::{AccountIdConversion, SaturatedConversion, Verify},
 		AccountId32, MultiSignature,
 	};
-	use std::str::FromStr;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -140,8 +139,9 @@ pub mod pallet {
 		type CreateNftDeposit: Get<BalanceOf<Self>>;
 
 		// DummyAccountWithBalanceForTest Account Id
-		// type DummyAccountWithBalanceForTest: Get<<Self as frame_system::Config>::AccountId>;
+		type DummyAccountWithBalanceForTest: Get<<Self as frame_system::Config>::AccountId>;
 		// type DummyAccountWithBalanceForTest: Get<AccountOf<Self>>;
+		// type DummyAccountWithBalanceForTest: EnsureOrigin<Self::Origin>;
 	}
 
 	#[pallet::pallet]
@@ -217,7 +217,7 @@ pub mod pallet {
 			thumbnail_image: VineMetaData,
 			metadata: Option<VineMetaData>,
 		) -> DispatchResult {
-			let creator = ensure_signed(origin)?;
+			let creator = ensure_signed(origin.clone())?;
 
 			let curr_user =
 				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
@@ -247,17 +247,19 @@ pub mod pallet {
 			// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
 			// )
 			// .into();
-			// let alice_acc = Ss58Codec::from_ss58check(alice_acc)?;
+			let alice_acc =
+				<T as pallet::Config>::DummyAccountWithBalanceForTest::get();
+			log::info!("alice_acc from runtime: {:#?}", alice_acc.clone());
 
 			// Transfer fund to pot
 			<T as pallet::Config>::Currency::transfer(
-				// &hex_literal::hex!(
+				// &hex_literal::hex![
 				// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
-				// )
+				// ]
 				// .into(),
 				// &node_testing::keyring::alice(),
-				&sp_keyring::sr25519::Keyring::Alice.to_account_id().to_ss58check(),
-				// &alice_acc,
+				// &sp_keyring::sr25519::Keyring::Alice.to_account_id().to_ss58check(),
+				&alice_acc,
 				&nft_account,
 				total_deposit,
 				ExistenceRequirement::KeepAlive,
@@ -642,7 +644,7 @@ pub mod pallet {
 				if let Some(ref c_vine_vec) = vine.created_vines {
 					for c_vine in c_vine_vec {
 						if c_vine.vine_id == vine_id {
-							return Ok(vine);
+							return Ok(vine)
 						}
 					}
 				}
