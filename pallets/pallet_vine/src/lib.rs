@@ -70,7 +70,8 @@ pub mod pallet {
 	pub type TokenIdOf<T> = <T as orml_nft::Config>::TokenId;
 	pub type ClassIdOf<T> = <T as orml_nft::Config>::ClassId;
 
-	pub const REWARD_AMT: u128 = 10000000000000;
+	pub const VINE_CREATED_REWARD_AMT: u128 = 10000000000000;
+	pub const VINE_VIEWED_REWARD_AMT: u128 = 5000000000000;
 
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
@@ -195,6 +196,8 @@ pub mod pallet {
 		CollectionDoesNotExist,
 		/// Not authorized
 		NoPermission,
+		/// Creator cannot be the viewer to get rewards
+		CreatorCannotBeTheViewer,
 	}
 
 	#[pallet::call]
@@ -206,7 +209,7 @@ pub mod pallet {
 			vine_description: VineMetaData,
 			video_url: VineMetaData,
 			thumbnail_image: VineMetaData,
-			metadata: VineMetaData,
+			metadata: Option<VineMetaData>,
 		) -> DispatchResult {
 			let creator = ensure_signed(origin)?;
 
@@ -261,13 +264,13 @@ pub mod pallet {
 				share_count: Default::default(),
 				comment_count: Default::default(),
 				did_view: Default::default(),
-				metadata: metadata.clone(),
+				metadata: metadata.clone().unwrap_or(b"metadata".to_vec()),
 			};
 
 			let token_id = orml_nft::Pallet::<T>::mint(
 				&creator,
 				curr_collection_id.clone(),
-				metadata.clone(),
+				metadata.clone().unwrap_or(b"metadata".to_vec()),
 				new_vine.clone(),
 			)?;
 
@@ -278,7 +281,7 @@ pub mod pallet {
 			<T as pallet::Config>::Currency::transfer(
 				&nft_account,
 				&creator,
-				REWARD_AMT.clone().saturated_into(),
+				VINE_CREATED_REWARD_AMT.clone().saturated_into(),
 				ExistenceRequirement::KeepAlive,
 			)?;
 
@@ -434,38 +437,64 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn mark_vine_as_viwed(
 			origin: OriginFor<T>,
-			user_id: UserId,
+			viewer_id: UserId,
 			vine_id: VineId,
 		) -> DispatchResult {
-			let _user = ensure_signed(origin)?;
+			let viewer = ensure_signed(origin)?;
 
 			let _curr_user =
-				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
+				pallet_user::Users::<T>::get(viewer_id).ok_or(Error::<T>::UserDoesNotExist)?;
 
-			let mut user_vines =
-				Self::user_vine_storage(user_id).ok_or(Error::<T>::UserHasNoVines)?;
+			let (vine_collection_id, vine_token_id) =
+				Self::get_vines(vine_id).ok_or(Error::<T>::VineDoesNotExist)?;
 
-			if let Some(ref mut c_vine_vec) = user_vines.created_vines {
-				'vine_loop: for vine in c_vine_vec.iter_mut() {
-					if vine.vine_id == vine_id {
-						vine.did_view = true;
-						vine.view_count += 1;
-						break 'vine_loop;
-					} else {
-						Err(Error::<T>::VineDoesNotExist)?;
-					}
-				}
-			}
-			VineStorageByUser::<T>::insert(user_id, user_vines);
+			let mut token_info =
+				<orml_nft::Tokens<T>>::get(vine_collection_id.clone(), vine_token_id.clone())
+					.ok_or(Error::<T>::VineDoesNotExist)?;
 
-			let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
-			Self::update_all_vine_storage_vec(updated_user_vine);
+			ensure!(viewer_id != token_info.data.user_id, Error::<T>::CreatorCannotBeTheViewer);
 
-			Self::deposit_event(Event::<T>::VineViewed(user_id, vine_id));
+			token_info.data.view_count += 1;
+			token_info.data.did_view = true;
+
+			<orml_nft::Tokens<T>>::insert(vine_collection_id.clone(), vine_token_id.clone(), token_info.clone());
+
+			let nft_account: AccountOf<T> = <T as pallet::Config>::PalletId::get().into_account();
+
+			<T as pallet::Config>::Currency::transfer(
+				&nft_account,
+				&viewer,
+				VINE_VIEWED_REWARD_AMT.saturated_into(),
+				ExistenceRequirement::KeepAlive
+			)?;
+
+			<T as pallet::Config>::Currency::transfer(
+				&nft_account,
+				&token_info.owner,
+				VINE_VIEWED_REWARD_AMT.saturated_into(),
+				ExistenceRequirement::KeepAlive
+			)?;
+
+			// if let Some(ref mut c_vine_vec) = user_vines.created_vines {
+			// 	'vine_loop: for vine in c_vine_vec.iter_mut() {
+			// 		if vine.vine_id == vine_id {
+			// 			vine.did_view = true;
+			// 			vine.view_count += 1;
+			// 			break 'vine_loop;
+			// 		} else {
+			// 			Err(Error::<T>::VineDoesNotExist)?;
+			// 		}
+			// 	}
+			// }
+			// VineStorageByUser::<T>::insert(user_id, user_vines);
+
+			// let updated_user_vine = Self::user_vine_storage(user_id).unwrap();
+			// Self::update_all_vine_storage_vec(updated_user_vine);
+
+			// Self::deposit_event(Event::<T>::VineViewed(user_id, vine_id));
 
 			Ok(())
 		}
-
 
 		// Commented for use in Phase2
 		// #[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
