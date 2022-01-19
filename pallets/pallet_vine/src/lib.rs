@@ -158,7 +158,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn get_vines)]
 	pub type Vines<T: Config> =
-		StorageMap<_, Twox64Concat, VineId, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
+		StorageMap<_, Twox64Concat, TokenIdOf<T>, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn get_collection_id_by_user)]
@@ -168,10 +168,10 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// [UserId, VineId, CollectionId, TokenId]
-		VineCreated(UserId, VineId, ClassIdOf<T>, TokenIdOf<T>),
-		/// [UserId, VineId]
-		VineViewed(UserId, VineId),
+		/// [UserId, CollectionId, VineId]
+		VineCreated(UserId, ClassIdOf<T>, TokenIdOf<T>),
+		/// [UserId, CollectionId, VineId]
+		VineViewed(UserId, ClassIdOf<T>, TokenIdOf<T>),
 		/// [Creator, CollectionId, CollectionName]
 		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData),
 	}
@@ -274,7 +274,7 @@ pub mod pallet {
 				new_vine.clone(),
 			)?;
 
-			Vines::<T>::insert(vine_count, (curr_collection_id.clone(), token_id.clone()));
+			Vines::<T>::insert(token_id.clone(), (curr_collection_id.clone(), token_id.clone()));
 
 			// at vine creation the creator is rewarded
 			// with 1 native token as reward
@@ -287,7 +287,6 @@ pub mod pallet {
 
 			Self::deposit_event(Event::<T>::VineCreated(
 				user_id,
-				vine_count,
 				curr_collection_id.clone(),
 				token_id,
 			));
@@ -438,7 +437,7 @@ pub mod pallet {
 		pub fn mark_vine_as_viwed(
 			origin: OriginFor<T>,
 			viewer_id: UserId,
-			vine_id: VineId,
+			vine_id: TokenIdOf<T>,
 		) -> DispatchResult {
 			let viewer = ensure_signed(origin)?;
 
@@ -457,7 +456,11 @@ pub mod pallet {
 			token_info.data.view_count += 1;
 			token_info.data.did_view = true;
 
-			<orml_nft::Tokens<T>>::insert(vine_collection_id.clone(), vine_token_id.clone(), token_info.clone());
+			<orml_nft::Tokens<T>>::insert(
+				vine_collection_id.clone(),
+				vine_token_id.clone(),
+				token_info.clone(),
+			);
 
 			let nft_account: AccountOf<T> = <T as pallet::Config>::PalletId::get().into_account();
 
@@ -465,15 +468,21 @@ pub mod pallet {
 				&nft_account,
 				&viewer,
 				VINE_VIEWED_REWARD_AMT.saturated_into(),
-				ExistenceRequirement::KeepAlive
+				ExistenceRequirement::KeepAlive,
 			)?;
 
 			<T as pallet::Config>::Currency::transfer(
 				&nft_account,
 				&token_info.owner,
 				VINE_VIEWED_REWARD_AMT.saturated_into(),
-				ExistenceRequirement::KeepAlive
+				ExistenceRequirement::KeepAlive,
 			)?;
+
+			Self::deposit_event(Event::<T>::VineViewed(
+				viewer_id,
+				vine_collection_id,
+				vine_token_id,
+			));
 
 			// if let Some(ref mut c_vine_vec) = user_vines.created_vines {
 			// 	'vine_loop: for vine in c_vine_vec.iter_mut() {
