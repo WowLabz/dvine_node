@@ -1,6 +1,6 @@
 use dvine_runtime::{
-	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, Signature, SudoConfig, TokensConfig,
-	SystemConfig, WASM_BINARY, OrmlNFTConfig,
+	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig, OrmlNFTConfig, Signature,
+	SudoConfig, SystemConfig, TokensConfig, WASM_BINARY,
 };
 use sc_service::ChainType;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -59,7 +59,6 @@ pub fn development_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
 					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-					AccountId::from_str("5E9qirdixDapJ4Z4JBZD4cpcR65NNbUbW4ScaXdrjLEVcScZ").unwrap(),
 					get_account_id_from_seed::<sr25519::Public>("Charlie"),
 				],
 				true,
@@ -113,7 +112,6 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
 					get_account_id_from_seed::<sr25519::Public>("Dave//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Eve//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
-					get_account_id_from_seed::<sr25519::Public>("5E9qirdixDapJ4Z4JBZD4cpcR65NNbUbW4ScaXdrjLEVcScZ"),
 				],
 				true,
 			)
@@ -161,6 +159,6 @@ fn testnet_genesis(
 		},
 		assets: Default::default(),
 		tokens: TokensConfig { balances: vec![] },
-		orml_nft: OrmlNFTConfig {tokens: vec![] },
+		orml_nft: OrmlNFTConfig { tokens: vec![] },
 	}
 }

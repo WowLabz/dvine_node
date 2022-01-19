@@ -22,9 +22,10 @@ use sp_runtime::{
 		NumberFor, Verify, Zero,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	AccountId32, ApplyExtrinsicResult, MultiSignature,
 };
 use sp_std::prelude::*;
+
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -413,7 +414,7 @@ impl orml_nft::Config for Runtime {
 parameter_types! {
 	pub const CurveDeposit: u128 = 10;
 	pub const CreatorAssetDeposit: u128 = 10;
-	pub const BondingCurvePalletId: PalletId = PalletId(*b"sub/bond");
+	pub const BondingCurvePalletId: PalletId = PalletId(*b"vine/nft");
 }
 
 impl pallet_user::Config for Runtime {
@@ -426,8 +427,9 @@ impl pallet_user::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CreateCollectionDeposit: Balance = 10000;
-	pub const CreateNftDeposit: Balance = 10000;
+	pub const CreateCollectionDeposit: Balance =  5000000000000;
+	pub const CreateNftDeposit: Balance = 5000000000000;
+	// pub const AliceAccount: AccountId = AccountId::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").unwrap();
 }
 
 impl pallet_vine::Config for Runtime {
@@ -436,6 +438,7 @@ impl pallet_vine::Config for Runtime {
 	type PalletId = BondingCurvePalletId;
 	type CreateCollectionDeposit = CreateCollectionDeposit;
 	type CreateNftDeposit = CreateNftDeposit;
+	// type DummyAccountWithBalanceForTest = AliceAccount;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

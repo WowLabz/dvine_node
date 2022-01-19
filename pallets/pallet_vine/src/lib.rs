@@ -70,6 +70,8 @@ pub mod pallet {
 	pub type TokenIdOf<T> = <T as orml_nft::Config>::TokenId;
 	pub type ClassIdOf<T> = <T as orml_nft::Config>::ClassId;
 
+	pub const REWARD_AMT: u128 = 1000000000000;
+
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
 	pub struct UserVines<T: Config> {
@@ -109,7 +111,10 @@ pub mod pallet {
 	pub trait Config:
 		frame_system::Config
 		+ pallet_user::Config
-		+ orml_nft::Config<TokenData = VineData<AccountOf<Self>>, ClassData = ClassData<BalanceOf<Self>>>
+		+ orml_nft::Config<
+			TokenData = VineData<AccountOf<Self>>,
+			ClassData = ClassData<BalanceOf<Self>>,
+		>
 	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
@@ -127,6 +132,9 @@ pub mod pallet {
 		/// The minimum balance to create token
 		#[pallet::constant]
 		type CreateNftDeposit: Get<BalanceOf<Self>>;
+
+		// DummyAccountWithBalanceForTest Account Id
+		// type DummyAccountWithBalanceForTest: Get<<Self as frame_system::Config>::AccountId>;
 	}
 
 	#[pallet::pallet]
@@ -150,6 +158,11 @@ pub mod pallet {
 	#[pallet::getter(fn get_vines)]
 	pub type Vines<T: Config> =
 		StorageMap<_, Twox64Concat, VineId, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn get_collection_id_by_user)]
+	pub type CollectionIdByUser<T: Config> =
+		StorageMap<_, Twox64Concat, UserId, ClassIdOf<T>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -186,6 +199,99 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn instant_vine_creation(
+			origin: OriginFor<T>,
+			user_id: UserId,
+			vine_description: VineMetaData,
+			video_url: VineMetaData,
+			thumbnail_image: VineMetaData,
+			metadata: VineMetaData,
+		) -> DispatchResult {
+			let creator = ensure_signed(origin)?;
+
+			let curr_user =
+				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
+
+			// creating a default class for the user
+			let curr_collection_id =
+				Self::check_and_create_user_collection_id(user_id, creator.clone())?;
+			log::info!("instant_create_vine class_id: {:#?}", curr_collection_id.clone());
+
+			let nft_account: AccountOf<T> = <T as pallet::Config>::PalletId::get().into_account();
+			log::info!("instant_create_vine pallet_id_acc: {:#?}", nft_account.clone());
+			let nft_sub_acc: AccountOf<T> =
+				<T as pallet::Config>::PalletId::get().into_sub_account(curr_collection_id.clone());
+			log::info!("instant_create_vine pallet_id_sub_acc: {:#?}", nft_sub_acc);
+
+			// Secure deposit of the collection and token class owner
+			let collection_deposit = T::CreateCollectionDeposit::get();
+			let asset_deposit = T::CreateNftDeposit::get();
+			let total_deposit = collection_deposit + asset_deposit;
+
+			// Transfer fund to pot
+			<T as pallet::Config>::Currency::transfer(
+				&creator,
+				&nft_account,
+				total_deposit,
+				ExistenceRequirement::KeepAlive,
+			)?;
+
+			// Reserve pot fund
+			// <T as pallet::Config>::Currency::reserve(
+			// 	&nft_account,
+			// 	<T as pallet::Config>::Currency::free_balance(&nft_account),
+			// )?;
+
+			let collection_info = <orml_nft::Classes<T>>::get(curr_collection_id.clone())
+				.ok_or(Error::<T>::CollectionDoesNotExist)?;
+
+			ensure!(creator.clone() == collection_info.owner, Error::<T>::NoPermission);
+
+			let vine_count = Self::increment_vine_counter();
+
+			let new_vine = VineData {
+				user_id,
+				vine_id: vine_count,
+				vine_creator: creator.clone(),
+				video_url,
+				thumbnail_image,
+				vine_description,
+				view_count: Default::default(),
+				share_count: Default::default(),
+				comment_count: Default::default(),
+				did_view: Default::default(),
+				metadata: metadata.clone(),
+			};
+
+			let token_id = orml_nft::Pallet::<T>::mint(
+				&creator,
+				curr_collection_id.clone(),
+				metadata.clone(),
+				new_vine.clone(),
+			)?;
+
+			Vines::<T>::insert(vine_count, (curr_collection_id.clone(), token_id.clone()));
+
+			// at vine creation the creator is rewarded
+			// with 1 native token as reward
+			<T as pallet::Config>::Currency::transfer(
+				&nft_account,
+				&creator,
+				REWARD_AMT.clone().saturated_into(),
+				ExistenceRequirement::KeepAlive,
+			)?;
+
+			Self::deposit_event(Event::<T>::VineCreated(
+				user_id,
+				vine_count,
+				curr_collection_id.clone(),
+				token_id,
+			));
+
+			Ok(())
+		}
+
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_collection(
 			origin: OriginFor<T>,
@@ -479,6 +585,36 @@ pub mod pallet {
 			}
 
 			Err(Error::<T>::VineDoesNotExist)
+		}
+
+		fn check_and_create_user_collection_id(
+			user_id: UserId,
+			creator: AccountOf<T>,
+		) -> Result<ClassIdOf<T>, DispatchError> {
+			if let Some(existing_class_id) = Self::get_collection_id_by_user(user_id) {
+				Ok(existing_class_id)
+			} else {
+				let default_class = b"default".to_vec();
+
+				let collection_deposit = T::CreateCollectionDeposit::get();
+
+				let new_class_data = ClassData {
+					deposit: collection_deposit,
+					collection_name: default_class.clone(),
+					description: default_class.clone(),
+					thumbnail_image: default_class.clone(),
+					metadata: default_class.clone(),
+				};
+
+				let next_class_id = <orml_nft::NextClassId<T>>::get();
+
+				let created_class_id =
+					orml_nft::Pallet::<T>::create_class(&creator, default_class, new_class_data)?;
+
+				CollectionIdByUser::<T>::insert(user_id, created_class_id);
+
+				Ok(created_class_id)
+			}
 		}
 
 		// fn generate_vine_id() -> [u8; 16] {
