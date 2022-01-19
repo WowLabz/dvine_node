@@ -427,8 +427,8 @@ impl pallet_user::Config for Runtime {
 }
 
 parameter_types! {
-	pub const CreateCollectionDeposit: Balance =  5000000000000;
-	pub const CreateNftDeposit: Balance = 5000000000000;
+	pub const CreateCollectionDeposit: Balance =  50000000000000;
+	pub const CreateNftDeposit: Balance = 50000000000000;
 	// pub const AliceAccount: AccountId = AccountId::from_str("5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY").unwrap();
 }
 
