@@ -171,6 +171,11 @@ pub mod pallet {
 	pub type CollectionIdByUser<T: Config> =
 		StorageMap<_, Twox64Concat, UserId, ClassIdOf<T>, OptionQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn all_vines)]
+	pub type AllVines<T: Config> =
+		StorageMap<_, Twox64Concat, u32, Vec<VineData<AccountOf<T>>>, OptionQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -180,6 +185,8 @@ pub mod pallet {
 		VineViewed(UserId, ClassIdOf<T>, TokenIdOf<T>),
 		/// [Creator, CollectionId, CollectionName]
 		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData),
+		/// [VineCount]
+		AllVinesStorageUpdated(u32),
 	}
 
 	#[pallet::error]
@@ -247,8 +254,7 @@ pub mod pallet {
 			// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
 			// )
 			// .into();
-			let alice_acc =
-				<T as pallet::Config>::DummyAccountWithBalanceForTest::get();
+			let alice_acc = <T as pallet::Config>::DummyAccountWithBalanceForTest::get();
 			log::info!("alice_acc from runtime: {:#?}", alice_acc.clone());
 
 			// Transfer fund to pot
@@ -526,6 +532,25 @@ pub mod pallet {
 			// Self::update_all_vine_storage_vec(updated_user_vine);
 
 			// Self::deposit_event(Event::<T>::VineViewed(user_id, vine_id));
+
+			Ok(())
+		}
+
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
+		pub fn get_all_vines(origin: OriginFor<T>) -> DispatchResult {
+			let client = ensure_signed(origin)?;
+
+			let mut all_vines: Vec<VineData<AccountOf<T>>> = Vec::new();
+
+			for (coll_id, token_id, token_info) in <orml_nft::Tokens<T>>::iter() {
+				all_vines.push(token_info.data);
+			}
+
+			log::info!("all_vines_vec: {:#?}", all_vines);
+
+			AllVines::<T>::insert(1u32, all_vines.clone());
+
+			Self::deposit_event(Event::<T>::AllVinesStorageUpdated(all_vines.len() as u32));
 
 			Ok(())
 		}
