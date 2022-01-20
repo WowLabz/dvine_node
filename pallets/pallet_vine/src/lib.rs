@@ -111,6 +111,45 @@ pub mod pallet {
 		is_watched: bool,
 	}
 
+	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
+	#[scale_info(skip_type_params(T))]
+	pub struct RewardsInfo<T: Config> {
+		created_vine_rewards: Option<BalanceOf<T>>,
+		viewed_vine_rewards: Option<BalanceOf<T>>,
+	}
+
+	impl<T: Config> RewardsInfo<T> {
+		fn new() -> Self {
+			Self { created_vine_rewards: None, viewed_vine_rewards: None }
+		}
+
+		fn set_created_vine_rewards(&mut self, amt: BalanceOf<T>) {
+			if let Some(mut reward) = self.created_vine_rewards {
+				log::info!("1");
+				self.created_vine_rewards = Some(reward + amt);
+			} else {
+				log::info!("2");
+				self.created_vine_rewards = Some(amt);
+			}
+		}
+
+		fn set_viewed_vine_rewards(&mut self, amt: BalanceOf<T>) {
+			if let Some(mut reward) = self.viewed_vine_rewards {
+				log::info!("3");
+				self.viewed_vine_rewards = Some(reward + amt);
+			} else {
+				log::info!("4");
+				self.viewed_vine_rewards = Some(amt);
+			}
+		}
+	}
+
+	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
+	pub enum RewardType {
+		CreatorReward,
+		ViewerReward,
+	}
+
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config:
@@ -148,33 +187,45 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
+	// counter for pallet_vine
 	#[pallet::storage]
 	#[pallet::getter(fn vine_count)]
 	pub type VineCount<T> = StorageValue<_, u64, ValueQuery>;
 
+	// not used in phase1
 	#[pallet::storage]
 	#[pallet::getter(fn vine_storage)]
 	pub type VineStorage<T: Config> = StorageValue<_, Vec<UserVines<T>>, OptionQuery>;
 
+	// not used in phase1
 	#[pallet::storage]
 	#[pallet::getter(fn user_vine_storage)]
 	pub type VineStorageByUser<T: Config> =
 		StorageMap<_, Twox64Concat, UserId, UserVines<T>, OptionQuery>;
 
+	// storage with vine_id and (collection_id, vine_id)
 	#[pallet::storage]
 	#[pallet::getter(fn get_vines)]
 	pub type Vines<T: Config> =
 		StorageMap<_, Twox64Concat, TokenIdOf<T>, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
 
+	// storage to get the collection id for a user
 	#[pallet::storage]
 	#[pallet::getter(fn get_collection_id_by_user)]
 	pub type CollectionIdByUser<T: Config> =
 		StorageMap<_, Twox64Concat, UserId, ClassIdOf<T>, OptionQuery>;
 
+	// storage for all the vines
 	#[pallet::storage]
 	#[pallet::getter(fn all_vines)]
 	pub type AllVines<T: Config> =
 		StorageMap<_, Twox64Concat, u32, Vec<VineData<AccountOf<T>>>, OptionQuery>;
+
+	// storage for user reward info
+	#[pallet::storage]
+	#[pallet::getter(fn get_user_rewards_info)]
+	pub type UserRewards<T: Config> =
+		StorageMap<_, Twox64Concat, UserId, RewardsInfo<T>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -315,6 +366,12 @@ pub mod pallet {
 				VINE_CREATED_REWARD_AMT.clone().saturated_into(),
 				ExistenceRequirement::KeepAlive,
 			)?;
+
+			Self::update_rewards_for_user(
+				user_id.clone(),
+				VINE_CREATED_REWARD_AMT.clone().saturated_into(),
+				RewardType::CreatorReward,
+			);
 
 			Self::deposit_event(Event::<T>::VineCreated(
 				user_id,
@@ -495,6 +552,7 @@ pub mod pallet {
 
 			let nft_account: AccountOf<T> = <T as pallet::Config>::PalletId::get().into_account();
 
+			// viwere is rewarded
 			<T as pallet::Config>::Currency::transfer(
 				&nft_account,
 				&viewer,
@@ -502,6 +560,13 @@ pub mod pallet {
 				ExistenceRequirement::KeepAlive,
 			)?;
 
+			Self::update_rewards_for_user(
+				viewer_id.clone(),
+				VINE_VIEWED_REWARD_AMT.clone().saturated_into(),
+				RewardType::ViewerReward,
+			);
+
+			// creator is rewarded
 			<T as pallet::Config>::Currency::transfer(
 				&nft_account,
 				&token_info.owner,
@@ -509,12 +574,19 @@ pub mod pallet {
 				ExistenceRequirement::KeepAlive,
 			)?;
 
+			Self::update_rewards_for_user(
+				token_info.data.user_id.clone(),
+				VINE_VIEWED_REWARD_AMT.clone().saturated_into(),
+				RewardType::CreatorReward,
+			);
+
 			Self::deposit_event(Event::<T>::VineViewed(
 				viewer_id,
 				vine_collection_id,
 				vine_token_id,
 			));
 
+			// Commented for use in Phase2
 			// if let Some(ref mut c_vine_vec) = user_vines.created_vines {
 			// 	'vine_loop: for vine in c_vine_vec.iter_mut() {
 			// 		if vine.vine_id == vine_id {
@@ -706,6 +778,42 @@ pub mod pallet {
 
 				Ok(created_class_id)
 			}
+		}
+
+		fn update_rewards_for_user(
+			user_id: UserId,
+			reward_amt: BalanceOf<T>,
+			reward_type: RewardType,
+		) {
+			// let mut new_reward_info = RewardsInfo::new();
+
+			let mut update_reward_info: RewardsInfo<T> =
+				Self::get_user_rewards_info(user_id.clone()).unwrap_or(RewardsInfo::new());
+
+			// let mut update_reward_info: RewardsInfo<T> =
+			// 	Self::get_user_rewards_info(user_id.clone()).unwrap();
+			log::info!(
+				"update_reward_info create: {:#?}",
+				update_reward_info.clone().created_vine_rewards
+			);
+			log::info!(
+				"update_reward_info view: {:#?}",
+				update_reward_info.clone().viewed_vine_rewards
+			);
+			log::info!("reward_type: {:#?}", reward_type);
+
+			match reward_type {
+				RewardType::CreatorReward => {
+					log::info!("5");
+					update_reward_info.set_created_vine_rewards(reward_amt.clone())
+				},
+				RewardType::ViewerReward => {
+					log::info!("6");
+					update_reward_info.set_viewed_vine_rewards(reward_amt.clone())
+				},
+			};
+
+			UserRewards::<T>::insert(user_id.clone(), update_reward_info);
 		}
 
 		// fn generate_vine_id() -> [u8; 16] {
