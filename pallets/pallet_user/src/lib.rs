@@ -28,8 +28,10 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::*;
 	use orml_traits::{MultiCurrency, MultiReservableCurrency};
-	use scale_info::prelude::vec;
-	use scale_info::{prelude::boxed::Box, TypeInfo};
+	use scale_info::{
+		prelude::{boxed::Box, vec},
+		TypeInfo,
+	};
 	use sp_runtime::traits::{AccountIdConversion, CheckedAdd, SaturatedConversion};
 
 	type BalanceOf<T> =
@@ -128,6 +130,10 @@ pub mod pallet {
 		TokenSpotPrice(CurrencyIdOf<T>, BalanceOf<T>),
 		/// (TokenId, Amount, FromAccount, ToAccounts)
 		UserTokensAirDropped(CurrencyIdOf<T>, BalanceOf<T>, AccountOf<T>, Vec<AccountOf<T>>),
+		/// (EmailId)
+		UserLoggedIn(UserMetaData),
+		/// (EmailId)
+		UserLoggedOut(UserMetaData),
 	}
 
 	#[pallet::error]
@@ -153,7 +159,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			user_name: UserMetaData,
 			profile_image: UserMetaData,
-			email: UserMetaData
+			email: UserMetaData,
 		) -> DispatchResult {
 			let creator = ensure_signed(origin)?;
 
@@ -163,7 +169,7 @@ pub mod pallet {
 				id: curr_user_id,
 				name: user_name.clone(),
 				profile_image,
-				email: email.clone(), 
+				email: email.clone(),
 				vines_count: None,
 				is_logged_in: false,
 				accounts: vec![creator],
@@ -179,17 +185,29 @@ pub mod pallet {
 
 		#[pallet::weight(0 + T::DbWeight::get().writes(1))]
 		pub fn log_in_user(origin: OriginFor<T>, email: UserMetaData) -> DispatchResult {
-			let user = ensure_signed(origin)?;
+			let _user = ensure_signed(origin)?;
+			Users::<T>::try_mutate(&email, |maybe_user_info| -> DispatchResult {
+				let user_info = maybe_user_info.as_mut().ok_or(Error::<T>::UserDoesNotExist)?;
+				user_info.is_logged_in = true;
+				Ok(())
+			})?;
+
+			Self::deposit_event(Event::<T>::UserLoggedIn(email));
 			Ok(())
 		}
 
 		#[pallet::weight(0 + T::DbWeight::get().writes(1))]
 		pub fn log_out_user(origin: OriginFor<T>, email: UserMetaData) -> DispatchResult {
-			let user = ensure_signed(origin)?;
+			let _user = ensure_signed(origin)?;
+			Users::<T>::try_mutate(&email, |maybe_user_info| -> DispatchResult {
+				let user_info = maybe_user_info.as_mut().ok_or(Error::<T>::UserDoesNotExist)?;
+				user_info.is_logged_in = false;
+				Ok(())
+			})?;
+
+			Self::deposit_event(Event::<T>::UserLoggedOut(email));
 			Ok(())
 		}
-
-
 
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_user_token(
@@ -197,10 +215,10 @@ pub mod pallet {
 			email: UserMetaData,
 			token_id: CurrencyIdOf<T>,
 			curve_type: CurveType,
-		 	token_name: Vec<u8>,
-		 	token_symbol: Vec<u8>,
-		 	token_decimals: u8,
-		 	max_supply: BalanceOf<T>,
+			token_name: Vec<u8>,
+			token_symbol: Vec<u8>,
+			token_decimals: u8,
+			max_supply: BalanceOf<T>,
 		) -> DispatchResult {
 			let creator = ensure_signed(origin)?;
 
@@ -239,7 +257,7 @@ pub mod pallet {
 			log::info!("total issuance {:#?}", T::Currency::total_issuance(token_id));
 
 			let new_token_info = TokenInfo::<T> {
-				token_id: token_id.clone(), 
+				token_id: token_id.clone(),
 				curve_id: curr_curve_id,
 				creator,
 				curve_type,
