@@ -39,15 +39,17 @@ pub mod pallet {
 		<T as frame_system::Config>::AccountId,
 	>>::CurrencyId;
 	pub type UserId = u64;
+	pub type UserMetaData = Vec<u8>;
 
 	#[derive(Encode, Decode, Debug, TypeInfo, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
 	pub struct User<T: Config> {
 		pub id: UserId,
-		pub name: Vec<u8>,
-		pub profile_image: Vec<u8>,
+		pub name: UserMetaData,
+		pub profile_image: UserMetaData,
+		pub email: UserMetaData,
 		pub vines_count: Option<u64>,
-		pub is_following: bool,
+		pub is_logged_in: bool,
 		pub accounts: Vec<AccountOf<T>>,
 		pub token_info: Option<TokenInfo<T>>,
 	}
@@ -99,7 +101,7 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn users)]
-	pub type Users<T: Config> = StorageMap<_, Twox64Concat, UserId, User<T>, OptionQuery>;
+	pub type Users<T: Config> = StorageMap<_, Twox64Concat, UserMetaData, User<T>, OptionQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn token_storage)]
@@ -114,10 +116,10 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// [UserId, UserName]
-		UserCreated(UserId, Vec<u8>),
-		/// [UserId, UserName, TokenId, TokenName]
-		UserWithTokenCreated(UserId, Vec<u8>, CurrencyIdOf<T>, Vec<u8>),
+		/// [EmailId, UserName]
+		UserCreated(UserMetaData, Vec<u8>),
+		/// [EmailId, UserName, TokenId, TokenName]
+		UserWithTokenCreated(UserMetaData, Vec<u8>, CurrencyIdOf<T>, Vec<u8>),
 		/// (Minter, TokenId, MintAmount, Cost)
 		TokenMint(AccountOf<T>, CurrencyIdOf<T>, BalanceOf<T>, BalanceOf<T>),
 		/// (Burner, TokenId, BurnAmount, ReturnAmount)
@@ -149,8 +151,9 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_user(
 			origin: OriginFor<T>,
-			user_name: Vec<u8>,
-			profile_image: Vec<u8>,
+			user_name: UserMetaData,
+			profile_image: UserMetaData,
+			email: UserMetaData
 		) -> DispatchResult {
 			let creator = ensure_signed(origin)?;
 
@@ -160,23 +163,38 @@ pub mod pallet {
 				id: curr_user_id,
 				name: user_name.clone(),
 				profile_image,
+				email: email.clone(), 
 				vines_count: None,
-				is_following: false,
+				is_logged_in: false,
 				accounts: vec![creator],
 				token_info: None,
 			};
 
-			Users::<T>::insert(curr_user_id, new_user.clone());
+			Users::<T>::insert(email.clone(), new_user.clone());
 
-			Self::deposit_event(Event::<T>::UserCreated(curr_user_id, user_name));
+			Self::deposit_event(Event::<T>::UserCreated(email, user_name));
 
 			Ok(())
 		}
 
+		#[pallet::weight(0 + T::DbWeight::get().writes(1))]
+		pub fn log_in_user(origin: OriginFor<T>, email: UserMetaData) -> DispatchResult {
+			let user = ensure_signed(origin)?;
+			Ok(())
+		}
+
+		#[pallet::weight(0 + T::DbWeight::get().writes(1))]
+		pub fn log_out_user(origin: OriginFor<T>, email: UserMetaData) -> DispatchResult {
+			let user = ensure_signed(origin)?;
+			Ok(())
+		}
+
+
+
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn create_user_token(
 			origin: OriginFor<T>,
-			user_id: UserId,
+			email: UserMetaData,
 			token_id: CurrencyIdOf<T>,
 			curve_type: CurveType,
 		 	token_name: Vec<u8>,
@@ -186,7 +204,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let creator = ensure_signed(origin)?;
 
-			let mut user = Self::users(user_id).ok_or(<Error<T>>::UserDoesNotExist)?;
+			let mut user = Self::users(email.clone()).ok_or(<Error<T>>::UserDoesNotExist)?;
 
 			log::info!(
 				"native token free_balance {:#?}",
@@ -234,11 +252,11 @@ pub mod pallet {
 			// Update the user with token_info
 			// and update the storages
 			user.token_info = Some(new_token_info);
-			Users::<T>::insert(user_id.clone(), user.clone());
+			Users::<T>::insert(email.clone(), user.clone());
 			TokenStorage::<T>::insert(token_id.clone(), user.clone());
 
 			Self::deposit_event(Event::UserWithTokenCreated(
-				user_id, user.name, token_id, token_name,
+				email, user.name, token_id, token_name,
 			));
 
 			Ok(())

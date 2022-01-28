@@ -6,7 +6,7 @@ use frame_system::pallet_prelude::*;
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
-use pallet_user::{User, UserId};
+use pallet_user::{User, UserMetaData};
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 // #[cfg(test)]
@@ -34,7 +34,7 @@ pub struct ClassData<Balance> {
 #[derive(Encode, Decode, Clone, TypeInfo, RuntimeDebug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct VineData<AccountId> {
-	pub user_id: UserId,
+	pub email: UserMetaData,
 	pub vine_id: VineId,
 	pub vine_creator: AccountId,
 	pub video_url: VineMetaData,
@@ -88,7 +88,7 @@ pub mod pallet {
 	#[derive(Encode, Decode, TypeInfo, Debug, Clone, PartialEq)]
 	#[scale_info(skip_type_params(T))]
 	pub struct Vine<T: Config> {
-		pub user_id: UserId,
+		pub email: UserMetaData,
 		pub vine_id: VineId,
 		pub vine_creator: AccountOf<T>,
 		pub video_url: Vec<u8>,
@@ -201,7 +201,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn user_vine_storage)]
 	pub type VineStorageByUser<T: Config> =
-		StorageMap<_, Twox64Concat, UserId, UserVines<T>, OptionQuery>;
+		StorageMap<_, Twox64Concat, UserMetaData, UserVines<T>, OptionQuery>;
 
 	// storage with vine_id and (collection_id, vine_id)
 	#[pallet::storage]
@@ -213,7 +213,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn get_collection_id_by_user)]
 	pub type CollectionIdByUser<T: Config> =
-		StorageMap<_, Twox64Concat, UserId, ClassIdOf<T>, OptionQuery>;
+		StorageMap<_, Twox64Concat, UserMetaData, ClassIdOf<T>, OptionQuery>;
 
 	// storage for all the vines
 	#[pallet::storage]
@@ -225,15 +225,15 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn get_user_rewards_info)]
 	pub type UserRewards<T: Config> =
-		StorageMap<_, Twox64Concat, UserId, RewardsInfo<T>, OptionQuery>;
+		StorageMap<_, Twox64Concat, UserMetaData, RewardsInfo<T>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// [UserId, CollectionId, VineId]
-		VineCreated(UserId, ClassIdOf<T>, TokenIdOf<T>),
-		/// [UserId, CollectionId, VineId]
-		VineViewed(UserId, ClassIdOf<T>, TokenIdOf<T>),
+		/// [EmailId, CollectionId, VineId]
+		VineCreated(UserMetaData, ClassIdOf<T>, TokenIdOf<T>),
+		/// [EmailId, CollectionId, VineId]
+		VineViewed(UserMetaData, ClassIdOf<T>, TokenIdOf<T>),
 		/// [Creator, CollectionId, CollectionName]
 		NewNftCollectionCreated(AccountOf<T>, ClassIdOf<T>, VineMetaData),
 		/// [VineCount]
@@ -269,7 +269,7 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn instant_vine_creation(
 			origin: OriginFor<T>,
-			user_id: UserId,
+			email: UserMetaData,
 			vine_description: VineMetaData,
 			video_url: VineMetaData,
 			thumbnail_image: VineMetaData,
@@ -278,11 +278,11 @@ pub mod pallet {
 			let creator = ensure_signed(origin.clone())?;
 
 			let curr_user =
-				pallet_user::Users::<T>::get(user_id).ok_or(Error::<T>::UserDoesNotExist)?;
+				pallet_user::Users::<T>::get(email.clone()).ok_or(Error::<T>::UserDoesNotExist)?;
 
 			// creating a default class for the user
 			let curr_collection_id =
-				Self::check_and_create_user_collection_id(user_id, creator.clone())?;
+				Self::check_and_create_user_collection_id(email.clone(), creator.clone())?;
 			log::info!("instant_create_vine class_id: {:#?}", curr_collection_id.clone());
 
 			let nft_account: AccountOf<T> = <T as pallet::Config>::PalletId::get().into_account();
@@ -299,23 +299,11 @@ pub mod pallet {
 			type Signature = MultiSignature;
 			type AccountPublic = <Signature as Verify>::Signer;
 
-			// let alice_acc: AccountOf<T> =
-			// 	AccountPublic::from(Pair::from_string_with_seed("//Alice", None)?.0).into();
-			// let alice_acc: AccountId32 = hex_literal::hex!(
-			// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
-			// )
-			// .into();
 			let alice_acc = <T as pallet::Config>::DummyAccountWithBalanceForTest::get();
 			log::info!("alice_acc from runtime: {:#?}", alice_acc.clone());
 
 			// Transfer fund to pot
 			<T as pallet::Config>::Currency::transfer(
-				// &hex_literal::hex![
-				// 	"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
-				// ]
-				// .into(),
-				// &node_testing::keyring::alice(),
-				// &sp_keyring::sr25519::Keyring::Alice.to_account_id().to_ss58check(),
 				&alice_acc,
 				&nft_account,
 				total_deposit,
@@ -336,7 +324,7 @@ pub mod pallet {
 			let vine_count = Self::increment_vine_counter();
 
 			let new_vine = VineData {
-				user_id,
+				email: email.clone(),
 				vine_id: vine_count,
 				vine_creator: creator.clone(),
 				video_url,
@@ -368,13 +356,13 @@ pub mod pallet {
 			)?;
 
 			Self::update_rewards_for_user(
-				user_id.clone(),
+				email.clone(),
 				VINE_CREATED_REWARD_AMT.clone().saturated_into(),
 				RewardType::CreatorReward,
 			);
 
 			Self::deposit_event(Event::<T>::VineCreated(
-				user_id,
+				email,
 				curr_collection_id.clone(),
 				token_id,
 			));
@@ -524,13 +512,13 @@ pub mod pallet {
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
 		pub fn mark_vine_as_viwed(
 			origin: OriginFor<T>,
-			viewer_id: UserId,
+			viewer_email: UserMetaData,
 			vine_id: TokenIdOf<T>,
 		) -> DispatchResult {
 			let viewer = ensure_signed(origin)?;
 
 			let _curr_user =
-				pallet_user::Users::<T>::get(viewer_id).ok_or(Error::<T>::UserDoesNotExist)?;
+				pallet_user::Users::<T>::get(viewer_email.clone()).ok_or(Error::<T>::UserDoesNotExist)?;
 
 			let (vine_collection_id, vine_token_id) =
 				Self::get_vines(vine_id).ok_or(Error::<T>::VineDoesNotExist)?;
@@ -539,7 +527,7 @@ pub mod pallet {
 				<orml_nft::Tokens<T>>::get(vine_collection_id.clone(), vine_token_id.clone())
 					.ok_or(Error::<T>::VineDoesNotExist)?;
 
-			ensure!(viewer_id != token_info.data.user_id, Error::<T>::CreatorCannotBeTheViewer);
+			ensure!(viewer_email.clone() != token_info.data.email, Error::<T>::CreatorCannotBeTheViewer);
 
 			token_info.data.view_count += 1;
 			token_info.data.did_view = true;
@@ -561,7 +549,7 @@ pub mod pallet {
 			)?;
 
 			Self::update_rewards_for_user(
-				viewer_id.clone(),
+				viewer_email.clone(),
 				VINE_VIEWED_REWARD_AMT.clone().saturated_into(),
 				RewardType::ViewerReward,
 			);
@@ -575,13 +563,13 @@ pub mod pallet {
 			)?;
 
 			Self::update_rewards_for_user(
-				token_info.data.user_id.clone(),
+				token_info.data.email.clone(),
 				VINE_VIEWED_REWARD_AMT.clone().saturated_into(),
 				RewardType::CreatorReward,
 			);
 
 			Self::deposit_event(Event::<T>::VineViewed(
-				viewer_id,
+				viewer_email,
 				vine_collection_id,
 				vine_token_id,
 			));
@@ -751,10 +739,10 @@ pub mod pallet {
 		}
 
 		fn check_and_create_user_collection_id(
-			user_id: UserId,
+			email: UserMetaData,
 			creator: AccountOf<T>,
 		) -> Result<ClassIdOf<T>, DispatchError> {
-			if let Some(existing_class_id) = Self::get_collection_id_by_user(user_id) {
+			if let Some(existing_class_id) = Self::get_collection_id_by_user(email.clone()) {
 				Ok(existing_class_id)
 			} else {
 				let default_class = b"default".to_vec();
@@ -774,21 +762,21 @@ pub mod pallet {
 				let created_class_id =
 					orml_nft::Pallet::<T>::create_class(&creator, default_class, new_class_data)?;
 
-				CollectionIdByUser::<T>::insert(user_id, created_class_id);
+				CollectionIdByUser::<T>::insert(email, created_class_id);
 
 				Ok(created_class_id)
 			}
 		}
 
 		fn update_rewards_for_user(
-			user_id: UserId,
+			email: UserMetaData,
 			reward_amt: BalanceOf<T>,
 			reward_type: RewardType,
 		) {
 			// let mut new_reward_info = RewardsInfo::new();
 
 			let mut update_reward_info: RewardsInfo<T> =
-				Self::get_user_rewards_info(user_id.clone()).unwrap_or(RewardsInfo::new());
+				Self::get_user_rewards_info(email.clone()).unwrap_or(RewardsInfo::new());
 
 			// let mut update_reward_info: RewardsInfo<T> =
 			// 	Self::get_user_rewards_info(user_id.clone()).unwrap();
@@ -813,7 +801,7 @@ pub mod pallet {
 				},
 			};
 
-			UserRewards::<T>::insert(user_id.clone(), update_reward_info);
+			UserRewards::<T>::insert(email.clone(), update_reward_info);
 		}
 
 		// fn generate_vine_id() -> [u8; 16] {
