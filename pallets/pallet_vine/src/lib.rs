@@ -345,7 +345,7 @@ pub mod pallet {
 				new_vine.clone(),
 			)?;
 
-			Vines::<T>::insert(token_id.clone(), (curr_collection_id.clone(), token_id.clone()));
+			Vines::<T>::insert(vine_count.clone(), (curr_collection_id.clone(), token_id.clone()));
 
 			// at vine creation the creator is rewarded
 			// with 1 native token as reward
@@ -685,7 +685,7 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		fn increment_vine_counter() -> u64 {
-			// VineCount::<T>::mutate(|n| *n += 1);
+			VineCount::<T>::mutate(|n| *n += 1);
 			Self::vine_count()
 		}
 
