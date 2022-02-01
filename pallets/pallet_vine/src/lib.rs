@@ -207,7 +207,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn get_vines)]
 	pub type Vines<T: Config> =
-		StorageMap<_, Twox64Concat, TokenIdOf<T>, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
+		StorageMap<_, Twox64Concat, VineId, (ClassIdOf<T>, TokenIdOf<T>), OptionQuery>;
 
 	// storage to get the collection id for a user
 	#[pallet::storage]
