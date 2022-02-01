@@ -322,6 +322,7 @@ pub mod pallet {
 			ensure!(creator.clone() == collection_info.owner, Error::<T>::NoPermission);
 
 			let vine_count = Self::increment_vine_counter();
+			// let vine_count = orml_nft::NextTokenId::<T>::get(curr_collection_id.clone());
 
 			let new_vine = VineData {
 				email: email.clone(),
@@ -684,7 +685,7 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		fn increment_vine_counter() -> u64 {
-			VineCount::<T>::mutate(|n| *n += 1);
+			// VineCount::<T>::mutate(|n| *n += 1);
 			Self::vine_count()
 		}
 
