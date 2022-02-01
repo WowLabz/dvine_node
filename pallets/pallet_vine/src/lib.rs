@@ -514,7 +514,7 @@ pub mod pallet {
 		pub fn mark_vine_as_viwed(
 			origin: OriginFor<T>,
 			viewer_email: UserMetaData,
-			vine_id: TokenIdOf<T>,
+			vine_id: VineId,
 		) -> DispatchResult {
 			let viewer = ensure_signed(origin)?;
 
